@@ -1,0 +1,66 @@
+{
+  "name": "@adamhl8/bask",
+  "version": "0.0.0",
+  "description": "A task runner for Bun where tasks are TypeScript functions",
+  "keywords": [
+    "build-tool",
+    "bun",
+    "cli",
+    "make",
+    "task-runner",
+    "typescript"
+  ],
+  "homepage": "https://github.com/adamhl8/bask",
+  "bugs": {
+    "url": "https://github.com/adamhl8/bask/issues"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Adam Langbert",
+    "email": "adamhl@pm.me",
+    "url": "https://github.com/adamhl8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/adamhl8/bask.git"
+  },
+  "bin": {
+    "bask": "./dist/cli.js"
+  },
+  "files": [
+    "dist/"
+  ],
+  "type": "module",
+  "imports": {
+    "#*": "./src/*"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "prepare": "just prepare"
+  },
+  "devDependencies": {
+    "@adamhl8/configs": "^2.8.2",
+    "@arethetypeswrong/core": "^0.18.5",
+    "@commitlint/cli": "^21.2.3",
+    "@commitlint/config-conventional": "^21.2.3",
+    "@types/bun": "^1.4.3",
+    "knip": "^6.41.0",
+    "markdown-toc": "^1.2.0",
+    "oxfmt": "^0.73.0",
+    "oxlint": "^1.88.0",
+    "oxlint-tsgolint": "^7.0.2004",
+    "publint": "^0.3.25",
+    "release-it": "^21.1.1",
+    "release-it-git-cliff": "^0.2.0",
+    "tsdown": "^0.23.1",
+    "typescript": "^7.0.2"
+  }
+}
