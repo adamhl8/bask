@@ -12,6 +12,14 @@ A task runner for Bun where tasks are TypeScript functions.
 bun add --dev @adamhl8/bask
 ```
 
+To run tasks with a plain `bask` instead of `bunx bask`, also install it globally:
+
+```sh
+bun add --global @adamhl8/bask
+```
+
+The global `bask` hands off to the project's copy when there is one, so each project still runs the version it pins.
+
 ## Usage
 
 Export tasks from a `bask.ts` in your project root. Calling a task from another task makes it a dependency, and each task runs at most once per invocation.
@@ -35,16 +43,18 @@ export const bumpDeps = task(async ({ sh }) => {
 export default build
 ```
 
-Run a task with `bunx`, because `bun bask` runs your `bask.ts` instead of the `bask` bin. Task names are the export names in kebab-case, so `bump-deps` runs `bumpDeps`.
+Run a task with `bask` if you installed it globally, or with `bunx bask` otherwise. Use `bunx` rather than `bun`, because `bun bask` runs your `bask.ts` instead of the `bask` bin. Task names are the export names in kebab-case, so `bump-deps` runs `bumpDeps`.
 
 ```sh
-bunx bask build
-bunx bask bump-deps
+bask build
+bask bump-deps
 ```
+
+Scripts and CI should use `bunx bask`, because they can't count on a global install.
 
 ### The default task and the task list
 
-`bunx bask` with no task name runs the default export. If `bask.ts` has no default export, it lists your tasks instead, the same as `bunx bask --list` (or `-l`):
+`bask` with no task name runs the default export. If `bask.ts` has no default export, it lists your tasks instead, the same as `bask --list` (or `-l`):
 
 ```
 Available tasks:
@@ -108,6 +118,6 @@ The built-in `list` task, which prints the task list, takes hooks too:
 import { list } from "@adamhl8/bask"
 
 list.after(() => {
-  console.log("\nRun `bunx bask <task>` to run a task.")
+  console.log("\nRun `bask <task>` to run a task.")
 })
 ```

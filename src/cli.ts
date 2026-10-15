@@ -3,13 +3,32 @@
 import path from "node:path"
 import { parseArgs } from "node:util"
 
+import bun from "bun"
+
 import { formatTaskList, list, setBaskModule } from "#list.ts"
 import { toExportName } from "#names.ts"
 import { isTask } from "#task.ts"
 
 const isModule = (value: unknown): value is Record<string, unknown> => typeof value === "object" && Boolean(value)
 
+/** Finds the project's own bask CLI, so a global `bask` runs the version the project pins. */
+const resolveLocalCli = () => {
+  try {
+    return bun.resolveSync("@adamhl8/bask/cli", process.cwd())
+  } catch {
+    return
+  }
+}
+
 const main = async () => {
+  // Import the local CLI and stop, because it runs its own `main` when loaded.
+  // The local copy resolves to its own path, so it skips this and runs normally.
+  const localCli = resolveLocalCli()
+  if (localCli && localCli !== import.meta.path) {
+    await import(localCli)
+    return
+  }
+
   const { values, positionals } = parseArgs({
     options: { list: { type: "boolean", short: "l" } },
     allowPositionals: true,
