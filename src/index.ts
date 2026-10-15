@@ -5,7 +5,7 @@ interface TaskOptions {
 }
 
 interface TaskContext {
-  $: typeof ShellWrapper
+  sh: typeof ShellWrapper
 }
 
 type AsyncOrSyncReturn = Promise<void> | void
@@ -30,7 +30,7 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
   const [options, fn] = typeof optionsOrFn === "function" ? [{}, optionsOrFn] : [optionsOrFn, maybeFn]
   if (!fn) throw new Error("task() needs a callback")
 
-  const ctx: TaskContext = { $: ShellWrapper }
+  const ctx: TaskContext = { sh: ShellWrapper }
   const beforeFns: TaskFn[] = []
   const afterFns: TaskFn[] = []
 

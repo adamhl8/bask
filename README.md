@@ -19,19 +19,21 @@ Export tasks from a `bask.ts` in your project root. The default export is the ta
 ```ts
 import { task } from "@adamhl8/bask"
 
-export const lint = task(async ({ $ }) => {
-  await $`oxlint`
+export const lint = task(async ({ sh }) => {
+  await sh`oxlint`
 })
 
-export const build = task({ desc: "Lint, then build" }, async ({ $ }) => {
+export const build = task({ desc: "Lint, then build" }, async ({ sh }) => {
   await lint()
-  await $`tsdown`
+  await sh`tsdown`
 })
 
 export default build
 ```
 
-Run a task with `bunx`, because `bun bask` runs your `bask.ts` instead of the `bask` bin. Each command is printed before it runs.
+`sh` prints each command before running it with Bun's `$`. To run a command without printing it, use Bun's `$` directly (`import { $ } from "bun"`).
+
+Run a task with `bunx`, because `bun bask` runs your `bask.ts` instead of the `bask` bin.
 
 ```sh
 bunx bask build
