@@ -15,6 +15,8 @@ type TaskFn = (ctx: TaskContext) => AsyncOrSyncReturn
 export interface Task {
   (): Promise<void>
   options: TaskOptions
+  before: (...fns: TaskFn[]) => void
+  after: (...fns: TaskFn[]) => void
 }
 
 const tasks = new WeakSet<object>()
@@ -28,19 +30,42 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
   const [options, fn] = typeof optionsOrFn === "function" ? [{}, optionsOrFn] : [optionsOrFn, maybeFn]
   if (!fn) throw new Error("task() needs a callback")
 
-  // Wrap `fn` so a sync `fn` still returns a promise.
-  const runFn = async () => fn({ $: ShellWrapper })
+  const ctx: TaskContext = { $: ShellWrapper }
+  const beforeFns: TaskFn[] = []
+  const afterFns: TaskFn[] = []
 
-  // Store the first call's promise so overlapping and later calls share it instead of rerunning `fn`.
-  let taskFnPromise: Promise<void> | undefined
+  // Store the first call's promise so overlapping and later calls share it instead of rerunning the task.
+  let runPromise: Promise<void> | undefined
 
-  const run = async () => {
-    if (taskFnPromise) return taskFnPromise
-    taskFnPromise = runFn()
-    return taskFnPromise
+  const assertNotStarted = () => {
+    if (runPromise) throw new Error("Can't add a hook to a task that has already started")
   }
 
-  const newTask: Task = Object.assign(run, { options })
+  const before = (...fns: TaskFn[]) => {
+    assertNotStarted()
+    beforeFns.push(...fns)
+  }
+
+  const after = (...fns: TaskFn[]) => {
+    assertNotStarted()
+    afterFns.push(...fns)
+  }
+
+  const runAll = async () => {
+    // oxlint-disable-next-line no-await-in-loop - hooks run in order
+    for (const beforeFn of beforeFns) await beforeFn(ctx)
+    await fn(ctx)
+    // oxlint-disable-next-line no-await-in-loop - hooks run in order
+    for (const afterFn of afterFns) await afterFn(ctx)
+  }
+
+  // Assign `runPromise` before any await so a concurrent call can't start a second run.
+  const run = async () => {
+    runPromise ??= runAll()
+    return runPromise
+  }
+
+  const newTask: Task = Object.assign(run, { options, before, after })
   tasks.add(newTask)
   return newTask
 }
