@@ -1,28 +1,37 @@
 #!/usr/bin/env bun
 
 import path from "node:path"
+import { parseArgs } from "node:util"
 
-import { isTask } from "#index.ts"
+import { formatTaskList, list, setBaskModule } from "#list.ts"
+import { toExportName } from "#names.ts"
+import { isTask } from "#task.ts"
 
 const isModule = (value: unknown): value is Record<string, unknown> => typeof value === "object" && Boolean(value)
 
-/** Converts a kebab-case task name to the camelCase export name, so `bump-deps` finds `bumpDeps`. */
-const toExportName = (taskName: string) => taskName.replaceAll(/-[a-z\d]/gv, (match) => match.slice(1).toUpperCase())
-
 const main = async () => {
-  const taskName = process.argv[2] ?? "default"
+  const { values, positionals } = parseArgs({
+    options: { list: { type: "boolean", short: "l" } },
+    allowPositionals: true,
+  })
 
   const baskModule: unknown = await import(path.resolve("bask.ts"))
   if (!isModule(baskModule)) throw new Error("failed to import bask.ts")
+  setBaskModule(baskModule)
 
-  const selectedTask = baskModule[toExportName(taskName)]
+  const [taskName] = positionals
+  const hasDefaultTask = isTask(baskModule["default"])
+
+  if (values.list || (taskName === undefined && !hasDefaultTask)) {
+    await list()
+    return
+  }
+
+  const selectedName = taskName ?? "default"
+  const selectedTask = baskModule[toExportName(selectedName)]
 
   if (!isTask(selectedTask)) {
-    const baskExports = Object.entries(baskModule)
-    const taskExports = baskExports.filter(([, value]) => isTask(value) && !value.options.hidden)
-    const taskNames = taskExports.map(([name]) => name)
-
-    console.error(`Unknown task "${taskName}". Available tasks: ${taskNames.join(", ")}`)
+    console.error(`Unknown task "${selectedName}".\n\n${formatTaskList()}`)
     process.exitCode = 1
     return
   }

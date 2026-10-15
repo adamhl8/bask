@@ -14,7 +14,7 @@ bun add --dev @adamhl8/bask
 
 ## Usage
 
-Export tasks from a `bask.ts` in your project root. The default export is the task that runs when you don't name one. Calling a task from another task makes it a dependency, and each task runs at most once per invocation.
+Export tasks from a `bask.ts` in your project root. Calling a task from another task makes it a dependency, and each task runs at most once per invocation.
 
 ```ts
 import { task } from "@adamhl8/bask"
@@ -28,13 +28,86 @@ export const build = task({ desc: "Lint, then build" }, async ({ sh }) => {
   await sh`tsdown`
 })
 
+export const bumpDeps = task(async ({ sh }) => {
+  await sh`bunx npm-check-updates --upgrade`
+})
+
 export default build
 ```
 
-`sh` prints each command before running it with Bun's `$`. To run a command without printing it, use Bun's `$` directly (`import { $ } from "bun"`).
-
-Run a task with `bunx`, because `bun bask` runs your `bask.ts` instead of the `bask` bin.
+Run a task with `bunx`, because `bun bask` runs your `bask.ts` instead of the `bask` bin. Task names are the export names in kebab-case, so `bump-deps` runs `bumpDeps`.
 
 ```sh
 bunx bask build
+bunx bask bump-deps
+```
+
+### The default task and the task list
+
+`bunx bask` with no task name runs the default export. If `bask.ts` has no default export, it lists your tasks instead, the same as `bunx bask --list` (or `-l`):
+
+```
+Available tasks:
+    build     # Lint, then build [default]
+    bump-deps
+    lint
+```
+
+`export * from` never re-exports a default, so a default from a shared tasks module only applies if you re-export it by name.
+
+### Task options
+
+- `desc`: shown next to the task in the list.
+- `hidden`: keeps the task runnable but leaves it out of the list.
+
+```ts
+export const releaseRun = task({ desc: "Run from CI", hidden: true }, async ({ sh }) => {
+  await sh`bun release-it --ci`
+})
+```
+
+### Running commands
+
+`sh` prints each command before running it with Bun's `$`. To run a command without printing it, use Bun's `$` directly.
+
+```ts
+import { $ } from "bun"
+
+export const release = task(async ({ sh }) => {
+  const branch = await $`git branch --show-current`.text()
+  if (branch.trim() === "main") await sh`gh workflow run release.yml`
+})
+```
+
+### Extending tasks
+
+`before` and `after` add hooks that run around a task. A hook added in your `bask.ts` also runs when another task calls that task, including tasks you imported. This lets a project extend shared tasks without replacing them.
+
+```ts
+import { task } from "@adamhl8/bask"
+
+import { build, lint } from "./shared-tasks.ts"
+
+export * from "./shared-tasks.ts"
+
+export const astroSync = task(async ({ sh }) => {
+  await sh`bun astro sync`
+})
+
+lint.before(astroSync)
+build.after(async ({ sh }) => {
+  await sh`bun astro build`
+})
+```
+
+Hooks take tasks or plain functions, run in the order they were added, and run once per invocation along with their task. Adding a hook to a task that has already started throws.
+
+The built-in `list` task, which prints the task list, takes hooks too:
+
+```ts
+import { list } from "@adamhl8/bask"
+
+list.after(() => {
+  console.log("\nRun `bunx bask <task>` to run a task.")
+})
 ```
