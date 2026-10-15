@@ -1,6 +1,6 @@
 {
   "name": "@adamhl8/bask",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Write your tasks in TypeScript",
   "keywords": [
     "build-tool",
