@@ -1,7 +1,7 @@
 {
   "name": "@adamhl8/bask",
   "version": "0.0.0",
-  "description": "A task runner for Bun where tasks are TypeScript functions",
+  "description": "Write your tasks in TypeScript",
   "keywords": [
     "build-tool",
     "bun",
