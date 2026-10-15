@@ -69,12 +69,25 @@ Available tasks:
 
 - `desc`: shown next to the task in the list.
 - `hidden`: keeps the task runnable but leaves it out of the list.
+- `alias`: other names the task runs under, as a string or an array. Write them in kebab-case or camelCase, and either spelling runs the task.
 
 ```ts
 export const releaseRun = task({ desc: "Run from CI", hidden: true }, async ({ sh }) => {
   await sh`bun release-it --ci`
 })
+
+export const bumpDeps = task({ alias: ["up", "update-deps"] }, async ({ sh }) => {
+  await sh`bunx npm-check-updates --upgrade`
+})
 ```
+
+Aliases show next to the task in the list:
+
+```
+    bump-deps # [aliases: up, update-deps]
+```
+
+Use `alias` rather than exporting the same task under a second name. bask can't tell which export is the original, so exporting a task twice is an error. `export default` is the exception.
 
 ### Running commands
 
@@ -88,6 +101,14 @@ export const release = task(async ({ sh }) => {
   if (branch.trim() === "main") await sh`gh workflow run release.yml`
 })
 ```
+
+When a command fails, bask stops and names the task it failed in, then exits with the command's exit code:
+
+```
+error: task 'lint' failed with exit code 2
+```
+
+Any other error thrown in a task still shows its stack trace.
 
 ### Extending tasks
 

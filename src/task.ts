@@ -4,6 +4,8 @@ interface TaskOptions {
   desc?: string
   /** Keeps the task runnable but leaves it out of the task list. */
   hidden?: boolean
+  /** Additional names to run the task. */
+  alias?: string | string[]
 }
 
 interface TaskContext {
@@ -24,6 +26,11 @@ export interface Task {
 const tasks = new WeakSet<object>()
 
 export const isTask = (value: unknown): value is Task => typeof value === "function" && tasks.has(value)
+
+const failedTasks = new WeakMap<Error, object>()
+
+/** Returns the innermost task that the error failed, so the CLI can name it. */
+export const getFailedTask = (error: Error) => failedTasks.get(error)
 
 /** Registers a task that runs at most once per bask invocation, however many times it's called. */
 export function task(fn: TaskFn): Task
@@ -64,7 +71,14 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
   // Assign `runPromise` before any await so a concurrent call can't start a second run.
   const run = async () => {
     runPromise ??= runAll()
-    return runPromise
+    try {
+      await runPromise
+    } catch (error) {
+      // Record `run` only if no task has yet, because the innermost task's catch runs first.
+      // `run` is the same object as the returned task.
+      if (error instanceof Error && !failedTasks.has(error)) failedTasks.set(error, run)
+      throw error
+    }
   }
 
   const newTask: Task = Object.assign(run, { options, before, after })
