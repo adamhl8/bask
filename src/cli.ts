@@ -19,7 +19,7 @@ const main = async () => {
 
   if (!isTask(selectedTask)) {
     const baskExports = Object.entries(baskModule)
-    const taskExports = baskExports.filter(([, value]) => isTask(value))
+    const taskExports = baskExports.filter(([, value]) => isTask(value) && !value.options.hidden)
     const taskNames = taskExports.map(([name]) => name)
 
     console.error(`Unknown task "${taskName}". Available tasks: ${taskNames.join(", ")}`)

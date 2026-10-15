@@ -2,6 +2,8 @@ import { ShellWrapper } from "#shell.ts"
 
 interface TaskOptions {
   desc?: string
+  /** Keeps the task runnable but leaves it out of the task list. */
+  hidden?: boolean
 }
 
 interface TaskContext {
