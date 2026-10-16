@@ -102,6 +102,10 @@ export const release = task(async ({ sh }) => {
 })
 ```
 
+Bun's `$` pipes each command's output, so commands can't tell they're printing to a terminal and usually turn color off. When bask's output goes to a terminal, `sh` sets `FORCE_COLOR=1` on the commands whose output you see. Commands you capture with `.text()`, `.json()`, `.lines()`, `.blob()`, or `.arrayBuffer()` don't get it, and neither do `.quiet()` commands, so captured output is plain text. A `FORCE_COLOR` or `NO_COLOR` in your environment or in `.env()` takes precedence.
+
+The `stdout` and `stderr` of an awaited `sh` command hold exactly what it printed, colors included.
+
 When a command fails, bask stops and names the task it failed in, then exits with the command's exit code:
 
 ```
@@ -109,6 +113,18 @@ error: task 'lint' failed with exit code 2
 ```
 
 Any other error thrown in a task still shows its stack trace.
+
+`sh` takes the same settings as Bun's global `$`: `sh.cwd()`, `sh.env()`, `sh.nothrow()`, and `sh.throws()`. They apply to the commands the task runs after the call, and a command's own `.cwd()` or `.env()` overrides them for that command.
+
+```ts
+export const buildWeb = task(async ({ sh }) => {
+  sh.cwd("packages/web")
+  await sh`bun install`
+  await sh`bun run build`
+})
+```
+
+Each task and each of its hooks gets its own `sh`, so these settings never reach another task or hook. Settings on Bun's global `$` don't apply to `sh`.
 
 ### Extending tasks
 

@@ -1,4 +1,7 @@
-import { ShellWrapper } from "#shell.ts"
+import { createShell } from "#shell.ts"
+import type { Shell } from "#shell.ts"
+
+type AsyncOrSyncReturn = Promise<void> | void
 
 interface TaskOptions {
   desc?: string
@@ -9,10 +12,8 @@ interface TaskOptions {
 }
 
 interface TaskContext {
-  sh: typeof ShellWrapper
+  sh: Shell
 }
-
-type AsyncOrSyncReturn = Promise<void> | void
 
 type TaskFn = (ctx: TaskContext) => AsyncOrSyncReturn
 
@@ -39,7 +40,6 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
   const [options, fn] = typeof optionsOrFn === "function" ? [{}, optionsOrFn] : [optionsOrFn, maybeFn]
   if (!fn) throw new Error("task() needs a callback")
 
-  const ctx: TaskContext = { sh: ShellWrapper }
   const beforeFns: TaskFn[] = []
   const afterFns: TaskFn[] = []
 
@@ -60,12 +60,15 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
     afterFns.push(...fns)
   }
 
+  // Give each hook and the task its own shell so settings like `sh.cwd()` stay inside the function that made them.
+  const runWithShell = async (taskFn: TaskFn) => taskFn({ sh: createShell() })
+
   const runAll = async () => {
     // oxlint-disable-next-line no-await-in-loop - hooks run in order
-    for (const beforeFn of beforeFns) await beforeFn(ctx)
-    await fn(ctx)
+    for (const beforeFn of beforeFns) await runWithShell(beforeFn)
+    await runWithShell(fn)
     // oxlint-disable-next-line no-await-in-loop - hooks run in order
-    for (const afterFn of afterFns) await afterFn(ctx)
+    for (const afterFn of afterFns) await runWithShell(afterFn)
   }
 
   // Assign `runPromise` before any await so a concurrent call can't start a second run.
