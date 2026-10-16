@@ -7,7 +7,7 @@ concurrentTestGlob = "**/*.test.ts"
 onlyFailures = true
 
 [install]
-linker = "isolated"
+linker = "hoisted"
 
 [run]
 bun = true

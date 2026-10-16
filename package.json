@@ -48,10 +48,11 @@
     "access": "public"
   },
   "scripts": {
-    "prepare": "just prepare"
+    "prepare": "bun tsdown && bun install --ignore-scripts --no-summary && bunx bask prepare"
   },
   "devDependencies": {
-    "@adamhl8/configs": "^2.8.2",
+    "@adamhl8/bask": "file:.",
+    "@adamhl8/configs": "^3.0.1",
     "@arethetypeswrong/core": "^0.18.5",
     "@commitlint/cli": "^21.2.3",
     "@commitlint/config-conventional": "^21.2.3",
