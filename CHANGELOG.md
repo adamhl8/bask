@@ -1,3 +1,13 @@
+## [0.2.0](https://github.com/adamhl8/bask/compare/v0.1.0..v0.2.0) - 2026-10-16
+
+### ✨ Improvements
+
+- better shell output ([08dbcf3](https://github.com/adamhl8/bask/commit/08dbcf3ab655ac916a25b07dcac62066bdb01f79) by @adamhl8)
+
+### ⚙️ Miscellaneous Tasks
+
+- migrate tooling ([88955c8](https://github.com/adamhl8/bask/commit/88955c84e75c5fadf6dc6c50fc06eedb08433929) by @adamhl8)
+
 ## [0.1.0](https://github.com/adamhl8/bask/compare/v0.0.1..v0.1.0) - 2026-10-15
 
 ### 🚀 Features
