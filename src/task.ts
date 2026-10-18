@@ -45,9 +45,11 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
 
   // Store the first call's promise so overlapping and later calls share it instead of rerunning the task.
   let runPromise: Promise<void> | undefined
+  // Track the start separately because `runAll` calls the task before `runPromise` is assigned.
+  let hasStarted = false
 
   const assertNotStarted = () => {
-    if (runPromise) throw new Error("Can't add a hook to a task that has already started")
+    if (hasStarted) throw new Error("Can't add a hook to a task that has already started")
   }
 
   const before = (...fns: TaskFn[]) => {
@@ -64,6 +66,7 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
   const runWithShell = async (taskFn: TaskFn) => taskFn({ sh: createShell() })
 
   const runAll = async () => {
+    hasStarted = true
     // oxlint-disable-next-line no-await-in-loop - hooks run in order
     for (const beforeFn of beforeFns) await runWithShell(beforeFn)
     await runWithShell(fn)
