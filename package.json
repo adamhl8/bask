@@ -48,7 +48,7 @@
     "access": "public"
   },
   "scripts": {
-    "prepare": "bun tsdown && bun install --ignore-scripts --no-summary && bunx bask prepare"
+    "prepare": "tsdown && bun install --ignore-scripts --no-summary && bunx bask prepare"
   },
   "devDependencies": {
     "@adamhl8/bask": "file:.",

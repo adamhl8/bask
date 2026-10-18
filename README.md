@@ -91,13 +91,11 @@ Use `alias` rather than exporting the same task under a second name. bask can't 
 
 ### Running commands
 
-`sh` prints each command before running it with Bun's `$`. To run a command without printing it, use Bun's `$` directly.
+`sh` prints each command before running it with Bun's `$`. To run a command without printing it, use `.echo(false)`.
 
 ```ts
-import { $ } from "bun"
-
 export const release = task(async ({ sh }) => {
-  const branch = await $`git branch --show-current`.text()
+  const branch = await sh`git branch --show-current`.echo(false).text()
   if (branch.trim() === "main") await sh`gh workflow run release.yml`
 })
 ```
@@ -114,7 +112,7 @@ error: task 'lint' failed with exit code 2
 
 Any other error thrown in a task still shows its stack trace.
 
-`sh` takes the same settings as Bun's global `$`: `sh.cwd()`, `sh.env()`, `sh.nothrow()`, and `sh.throws()`. They apply to the commands the task runs after the call, and a command's own `.cwd()` or `.env()` overrides them for that command.
+`sh` takes the same settings as Bun's global `$`: `sh.cwd()`, `sh.env()`, `sh.nothrow()`, and `sh.throws()`, plus `sh.echo()`. They apply to the commands the task runs after the call, and a command's own setting overrides them for that command.
 
 ```ts
 export const buildWeb = task(async ({ sh }) => {

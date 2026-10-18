@@ -5,20 +5,19 @@ import type { $ as BunShell, ShellExpression } from "bun"
 
 type ShellEnv = Parameters<BunShell.ShellPromise["env"]>[0]
 
-/** Changes each method of `T` that returns `From` to return `To`, keeping Bun's docs on it. */
-type Rechain<T, From, To> = {
-  [K in keyof T]: T[K] extends (...args: infer Args) => From ? (...args: Args) => To : T[K]
-}
-
-// Leave out `stdin` because Bun's types declare it but the runtime doesn't have it.
-type BunCommandMethods = Omit<BunShell.ShellPromise, keyof Promise<BunShell.ShellOutput> | "stdin">
-
-// Treat every other member of Bun's `$` as a setting, so a new one fails to compile until `createShell` handles it.
-type ShellSettingKey = Exclude<keyof BunShell, "braces" | "escape" | "Shell" | "ShellError" | "ShellPromise">
-
 /** Runs commands like Bun's `$`, with settings that apply to every later command from the same shell. */
-export interface Shell extends Rechain<Pick<BunShell, ShellSettingKey>, BunShell, Shell> {
+export interface Shell {
   (strings: TemplateStringsArray, ...expressions: ShellExpression[]): ShellCommand
+  /** Change the default working directory for commands run by this shell. */
+  cwd: (newCwd?: string) => Shell
+  /** Change the default environment variables for commands run by this shell. */
+  env: (newEnv?: ShellEnv) => Shell
+  /** Configure the shell to not throw an exception on non-zero exit codes. */
+  nothrow: () => Shell
+  /** Configure whether the shell should throw an exception on non-zero exit codes. */
+  throws: (shouldThrow: boolean) => Shell
+  /** Configure whether the shell prints each command before running it. */
+  echo: (shouldEcho: boolean) => Shell
 }
 
 /** Formats an interpolated value the way Bun's shell escapes it. */
@@ -41,62 +40,83 @@ const shouldForceColor = (env: NonNullable<ShellEnv>) =>
  * Wraps Bun's `ShellPromise` to set `FORCE_COLOR` only on commands whose output is shown. Bun's pipes hide the terminal
  * from commands, so they turn color off unless forced.
  */
-class ShellCommand
-  implements PromiseLike<BunShell.ShellOutput>, Rechain<BunCommandMethods, BunShell.ShellPromise, ShellCommand>
-{
+class ShellCommand implements PromiseLike<BunShell.ShellOutput> {
   readonly #promise: BunShell.ShellPromise
+  readonly #command: string
   #env: ShellEnv
+  #shouldEcho: boolean
   #isQuiet = false
   #isPrepared = false
 
-  public constructor(promise: BunShell.ShellPromise, env: ShellEnv) {
+  public constructor(
+    promise: BunShell.ShellPromise,
+    { command, env, shouldEcho }: { command: string; env: ShellEnv; shouldEcho: boolean },
+  ) {
     this.#promise = promise
+    this.#command = command
     this.#env = env
+    this.#shouldEcho = shouldEcho
   }
 
+  /** Change the current working directory of the shell. */
   public cwd(newCwd: string) {
     void this.#promise.cwd(newCwd)
     return this
   }
 
+  /** Set environment variables for the shell. */
   public env(newEnv: ShellEnv) {
     this.#env = newEnv
     return this
   }
 
+  /** Configure the shell to only buffer the output instead of also writing it to stdout and stderr. */
   public quiet(isQuiet = true) {
     void this.#promise.quiet(isQuiet)
     this.#isQuiet = isQuiet
     return this
   }
 
+  /** Configure the shell to not throw an exception on non-zero exit codes. */
   public nothrow() {
     void this.#promise.nothrow()
     return this
   }
 
+  /** Configure whether the shell should throw an exception on non-zero exit codes. */
   public throws(shouldThrow: boolean) {
     void this.#promise.throws(shouldThrow)
     return this
   }
 
+  /** Configure whether the shell prints the command before running it. */
+  public echo(shouldEcho: boolean) {
+    this.#shouldEcho = shouldEcho
+    return this
+  }
+
+  /** Read from stdout as a string. Automatically calls {@link quiet}. */
   public async text(encoding?: BufferEncoding) {
     return this.#prepare(false).text(encoding)
   }
 
+  /** Read from stdout as a JSON object. Automatically calls {@link quiet}. */
   public async json() {
     // oxlint-disable-next-line typescript/no-unsafe-return - match Bun's `json()`, which returns `any`
     return this.#prepare(false).json()
   }
 
+  /** Read from stdout as a string, line by line. Automatically calls {@link quiet}. */
   public lines() {
     return this.#prepare(false).lines()
   }
 
+  /** Read from stdout as an ArrayBuffer. Automatically calls {@link quiet}. */
   public async arrayBuffer() {
     return this.#prepare(false).arrayBuffer()
   }
 
+  /** Read from stdout as a Blob. Automatically calls {@link quiet}. */
   public async blob() {
     return this.#prepare(false).blob()
   }
@@ -117,12 +137,15 @@ class ShellCommand
     return this.#prepare(!this.#isQuiet).finally(onfinally)
   }
 
-  /** Sets the command's environment once, before Bun starts the command. */
+  /** Prints the command and sets its environment once, before Bun starts the command. */
   // oxlint-disable-next-line typescript/promise-function-async - an async function would await the command and start it
   #prepare(isShown: boolean) {
     // Skip a command that already started, because Bun rejects `env` on it.
     if (this.#isPrepared) return this.#promise
     this.#isPrepared = true
+
+    // Write to `process.stderr` directly because Bun colors `console.error` output red in a terminal.
+    if (this.#shouldEcho) process.stderr.write(`${styleText("bold", this.#command, { stream: process.stderr })}\n`)
 
     // Pass `process.env` even without color because Bun copies it when the command is created, not when it runs.
     // oxlint-disable-next-line node/no-process-env - read the environment as it is when the command runs
@@ -138,13 +161,12 @@ export const createShell = () => {
   const bunShell = new bun.$.Shell()
   // Keep `env` here instead of on `bunShell` because `ShellCommand` passes it when each command runs.
   let shellEnv: ShellEnv
+  let shouldEcho = true
 
   const run = (strings: TemplateStringsArray, ...expressions: ShellExpression[]) => {
     // Use `String.raw` because Bun's `$` also reads the raw template strings.
-    const command = String.raw({ raw: strings.raw }, ...expressions.map(formatExpression))
-    // Write to `process.stderr` directly because Bun colors `console.error` output red in a terminal.
-    process.stderr.write(`${styleText("bold", command.trim(), { stream: process.stderr })}\n`)
-    return new ShellCommand(bunShell(strings, ...expressions), shellEnv)
+    const command = String.raw({ raw: strings.raw }, ...expressions.map(formatExpression)).trim()
+    return new ShellCommand(bunShell(strings, ...expressions), { command, env: shellEnv, shouldEcho })
   }
 
   const shell: Shell = Object.assign(run, {
@@ -162,6 +184,10 @@ export const createShell = () => {
     },
     throws: (shouldThrow: boolean) => {
       bunShell.throws(shouldThrow)
+      return shell
+    },
+    echo: (newShouldEcho: boolean) => {
+      shouldEcho = newShouldEcho
       return shell
     },
   })
