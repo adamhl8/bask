@@ -1,3 +1,9 @@
+## [0.3.0](https://github.com/adamhl8/bask/compare/v0.2.0..v0.3.0) - 2026-10-18
+
+### 🚀 Features
+
+- add the ability to turn off/on the printing of commands ([4874cfd](https://github.com/adamhl8/bask/commit/4874cfdd97650f69b59b4b67f9f9925ef49f0ef5) by @adamhl8)
+
 ## [0.2.0](https://github.com/adamhl8/bask/compare/v0.1.0..v0.2.0) - 2026-10-16
 
 ### ✨ Improvements
