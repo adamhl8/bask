@@ -105,6 +105,8 @@ export const hello = task(() => {
 })
 ```
 
+---
+
 ### Task options
 
 - `desc`: Shown next to the task in the task list
@@ -128,6 +130,8 @@ Aliases show next to the task in the task list:
     bump-deps # [aliases: up, update-deps]
 ```
 
+---
+
 ### Task naming
 
 A task exported with a camelCase name can be run by using its equivalent kebab-case name.
@@ -145,6 +149,8 @@ bask bumpDeps
 bask bump-deps
 ```
 
+---
+
 ### The default task
 
 Running `bask` on its own runs the default export. If `bask.ts` has no default export, it lists your tasks instead (the same as `bask --list`).
@@ -158,6 +164,8 @@ export const build = task(async ({ sh }) => {
 
 export default build
 ```
+
+---
 
 ### Task dependencies
 
@@ -173,6 +181,8 @@ export const ci = task(async () => {
   await lint() // already ran, so this does nothing
 })
 ```
+
+---
 
 ### Task hooks
 
