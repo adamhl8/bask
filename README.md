@@ -1,28 +1,57 @@
-# bask
+<h1 align="center"><img align="top" style="color:#36BCF7; width:38px; height:38px;" src="https://raw.githubusercontent.com/adamhl8/bask/refs/heads/main/assets/logo.svg"> bask</h1>
 
-A task runner for Bun where tasks are TypeScript functions.
+A task runner for Bun where your tasks are TypeScript functions.
 
-## Requirements
+- Tasks are plain functions, so a dependency is just a function call
+- A built-in shell (`sh`) that prints each command and keeps colored output
+- Share tasks across projects as a package and extend them with `before` and `after` hooks
+- A global `bask` that hands off to each project's own version
 
-- [Bun](https://bun.sh), because tasks run on Bun and shell out with Bun's `$`
+---
 
-## Install
+<!-- toc -->
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [Why?](#why)
+- [Tasks](#tasks)
+  - [Defining tasks](#defining-tasks)
+  - [Task options](#task-options)
+  - [The default task](#the-default-task)
+- [Running commands](#running-commands)
+  - [Colored output](#colored-output)
+  - [Shell settings](#shell-settings)
+  - [Errors](#errors)
+- [Extending tasks](#extending-tasks)
+- [CLI](#cli)
+- [API](#api)
+  - [`task` Function](#task-function)
+  - [`Task` Type](#task-type)
+  - [`list` Task](#list-task)
+  - [`isTask` Function](#istask-function)
+
+<!-- tocstop -->
+
+## Installation
+
+bask requires [Bun](https://bun.sh). Tasks run on Bun, and commands run through Bun's `$` shell.
 
 ```sh
 bun add --dev @adamhl8/bask
 ```
 
-To run tasks with a plain `bask` instead of `bunx bask`, also install it globally:
-
-```sh
-bun add --global @adamhl8/bask
-```
-
-The global `bask` hands off to the project's copy when there is one, so each project still runs the version it pins.
+> [!TIP]
+> To run tasks with a plain `bask` instead of `bunx bask`, also install it globally:
+>
+> ```sh
+> bun add --global @adamhl8/bask
+> ```
+>
+> The global `bask` hands off to the project's copy when there is one, so each project still runs the version it pins.
 
 ## Usage
 
-Export tasks from a `bask.ts` in your project root. Calling a task from another task makes it a dependency, and each task runs at most once per invocation.
+Create a `bask.ts` in your project root and export some tasks:
 
 ```ts
 import { task } from "@adamhl8/bask"
@@ -32,7 +61,7 @@ export const lint = task(async ({ sh }) => {
 })
 
 export const build = task({ desc: "Lint, then build" }, async ({ sh }) => {
-  await lint()
+  await lint() // calling a task makes it a dependency
   await sh`tsdown`
 })
 
@@ -43,18 +72,19 @@ export const bumpDeps = task(async ({ sh }) => {
 export default build
 ```
 
-Run a task with `bask` if you installed it globally, or with `bunx bask` otherwise. Use `bunx` rather than `bun`, because `bun bask` runs your `bask.ts` instead of the `bask` bin. Task names are the export names in kebab-case, so `bump-deps` runs `bumpDeps`.
+Run a task by its export name in kebab-case:
 
 ```sh
 bask build
-bask bump-deps
+bask bump-deps # runs `bumpDeps`
 ```
 
-Scripts and CI should use `bunx bask`, because they can't count on a global install.
+If you didn't install bask globally, use `bunx bask` instead. Use `bunx` rather than `bun`, because `bun bask` runs your `bask.ts` instead of the `bask` bin.
 
-### The default task and the task list
+> [!NOTE]
+> Scripts and CI should use `bunx bask`, because they can't count on a global install.
 
-`bask` with no task name runs the default export. If `bask.ts` has no default export, it lists your tasks instead, the same as `bask --list` (or `-l`):
+Run `bask` with no task name to run the default export (`build` above), or list your tasks with `bask --list`:
 
 ```
 Available tasks:
@@ -63,13 +93,52 @@ Available tasks:
     lint
 ```
 
-`export * from` never re-exports a default, so a default from a shared tasks module only applies if you re-export it by name.
+## Why?
+
+Tasks usually end up in a justfile, a Makefile, or `package.json` scripts. Those work fine until you want the same tasks in more than one project. Then you end up copying them around and keeping the copies in sync.
+
+bask tasks are just TypeScript, so:
+
+- They get type checking, imports, and everything else TypeScript has
+- They can be published as a package and shared across projects (`export * from "your-shared-tasks"`)
+- Each project can extend a shared task with hooks instead of copying and editing it
+
+## Tasks
+
+### Defining tasks
+
+`task` takes a function, and optionally an [options](#task-options) object first:
+
+```ts
+export const lint = task(async ({ sh }) => {
+  await sh`oxlint`
+})
+
+export const build = task({ desc: "Lint, then build" }, async ({ sh }) => {
+  await lint()
+  await sh`tsdown`
+})
+```
+
+To depend on another task, call it. Each task runs at most once per invocation, however many tasks call it. If two tasks call it at the same time, they both wait on the same run.
+
+```ts
+export const check = task(async () => {
+  await Promise.all([lint(), typecheck()])
+})
+
+export const ci = task(async () => {
+  await check()
+  await lint() // already ran, so this does nothing
+})
+```
 
 ### Task options
 
-- `desc`: shown next to the task in the list.
-- `hidden`: keeps the task runnable but leaves it out of the list.
-- `alias`: other names the task runs under, as a string or an array. Write them in kebab-case or camelCase, and either spelling runs the task.
+- `desc`: Shown next to the task in the task list
+- `hidden`: Keeps the task runnable but leaves it out of the task list
+- `alias`: Other names the task runs under, as a string or an array
+  - Write them in kebab-case or camelCase, and either spelling runs the task
 
 ```ts
 export const releaseRun = task({ desc: "Run from CI", hidden: true }, async ({ sh }) => {
@@ -81,7 +150,7 @@ export const bumpDeps = task({ alias: ["up", "update-deps"] }, async ({ sh }) =>
 })
 ```
 
-Aliases show next to the task in the list:
+Aliases show next to the task in the task list:
 
 ```
     bump-deps # [aliases: up, update-deps]
@@ -89,9 +158,30 @@ Aliases show next to the task in the list:
 
 Use `alias` rather than exporting the same task under a second name. bask can't tell which export is the original, so exporting a task twice is an error. `export default` is the exception.
 
-### Running commands
+### The default task
 
-`sh` prints each command before running it with Bun's `$`. To run a command without printing it, use `.echo(false)`.
+`bask` with no task name runs the default export. If `bask.ts` has no default export, it lists your tasks instead (the same as `bask --list`).
+
+> [!IMPORTANT]
+> `export * from` never re-exports a default. If a shared tasks module has a default export, re-export it by name for it to apply:
+>
+> ```ts
+> export * from "./shared-tasks.ts"
+> export { default } from "./shared-tasks.ts"
+> ```
+
+## Running commands
+
+Every task gets a shell, `sh`, which works like Bun's `$`. The difference is that `sh` prints each command before running it:
+
+```ts
+export const lint = task(async ({ sh }) => {
+  await sh`oxlint --fix`
+  // prints "oxlint --fix", then runs it
+})
+```
+
+To run a command without printing it, use `.echo(false)`:
 
 ```ts
 export const release = task(async ({ sh }) => {
@@ -100,19 +190,36 @@ export const release = task(async ({ sh }) => {
 })
 ```
 
-Bun's `$` pipes each command's output, so commands can't tell they're printing to a terminal and usually turn color off. When bask's output goes to a terminal, `sh` sets `FORCE_COLOR=1` on the commands whose output you see. Commands you capture with `.text()`, `.json()`, `.lines()`, `.blob()`, or `.arrayBuffer()` don't get it, and neither do `.quiet()` commands, so captured output is plain text. A `FORCE_COLOR` or `NO_COLOR` in your environment or in `.env()` takes precedence.
+Everything else works the same as Bun's `$`, so see the [Bun Shell docs](https://bun.sh/docs/runtime/shell) for the full API.
 
-The `stdout` and `stderr` of an awaited `sh` command hold exactly what it printed, colors included.
+### Colored output
 
-When a command fails, bask stops and names the task it failed in, then exits with the command's exit code:
+When bask's output goes to a terminal, commands keep their colors. This includes the `stdout` and `stderr` of an awaited command.
 
-```
-error: task 'lint' failed with exit code 2
-```
+Commands you capture with `.text()`, `.json()`, `.lines()`, `.blob()`, or `.arrayBuffer()` give you plain text, and so do `.quiet()` commands.
 
-Any other error thrown in a task still shows its stack trace.
+<details>
+  <summary><i>How does this work?</i></summary>
 
-`sh` takes the same settings as Bun's global `$`: `sh.cwd()`, `sh.env()`, `sh.nothrow()`, and `sh.throws()`, plus `sh.echo()`. They apply to the commands the task runs after the call, and a command's own setting overrides them for that command.
+Bun's `$` pipes each command's output, so commands can't tell they're printing to a terminal and usually turn color off.
+
+When bask's stdout and stderr are both terminals, `sh` sets `FORCE_COLOR=1` on the commands whose output you see. Captured and quiet commands don't get it.
+
+If `FORCE_COLOR` or `NO_COLOR` is already set, either in your environment or with `.env()`, bask leaves it alone.
+
+</details>
+
+### Shell settings
+
+`sh` takes the same settings as Bun's global `$`, plus `echo`:
+
+- `sh.cwd()`
+- `sh.env()`
+- `sh.nothrow()`
+- `sh.throws()`
+- `sh.echo()`
+
+They apply to every command the task runs after the call. A command's own setting (e.g. ``sh`...`.cwd()``) overrides them for that command.
 
 ```ts
 export const buildWeb = task(async ({ sh }) => {
@@ -122,9 +229,20 @@ export const buildWeb = task(async ({ sh }) => {
 })
 ```
 
-Each task and each of its hooks gets its own `sh`, so these settings never reach another task or hook. Settings on Bun's global `$` don't apply to `sh`.
+- Each task and each of its hooks gets its own `sh`, so these settings never reach another task or hook.
+- Settings on Bun's global `$` don't apply to `sh`.
 
-### Extending tasks
+### Errors
+
+When a command fails, bask stops, names the task it failed in, and exits with the command's exit code:
+
+```
+error: task 'lint' failed with exit code 2
+```
+
+Any other error thrown in a task still shows its stack trace.
+
+## Extending tasks
 
 `before` and `after` add hooks that run around a task. A hook added in your `bask.ts` also runs when another task calls that task, including tasks you imported. This lets a project extend shared tasks without replacing them.
 
@@ -145,7 +263,10 @@ build.after(async ({ sh }) => {
 })
 ```
 
-Hooks take tasks or plain functions, run in the order they were added, and run once per invocation along with their task. Adding a hook to a task that has already started throws.
+- Hooks take tasks or plain functions
+- Hooks run in the order they were added
+- Hooks run once per invocation, along with their task
+- Adding a hook to a task that has already started throws an error
 
 The built-in `list` task, which prints the task list, takes hooks too:
 
@@ -156,3 +277,93 @@ list.after(() => {
   console.log("\nRun `bask <task>` to run a task.")
 })
 ```
+
+## CLI
+
+`bask [options] [task]`
+
+- `task`: The task to run, by its kebab-case or camelCase name or an alias (default: the default export)
+- `-l`, `--list`: List the available tasks
+
+If the task doesn't exist, bask prints an error followed by the task list.
+
+**Exit codes:**
+
+- `0`: The task succeeded
+- `1`: There's no `bask.ts`, it has a problem (e.g. a task exported twice), or the task doesn't exist
+- `2`: The arguments are invalid
+- Otherwise, the exit code of the command that failed
+
+## API
+
+bask exports:
+
+- `task` Function
+- `Task` Type
+- `list` Task
+- `isTask` Function
+
+---
+
+### `task` Function
+
+```ts
+function task(fn: (ctx: TaskContext) => Promise<void> | void): Task
+function task(options: TaskOptions, fn: (ctx: TaskContext) => Promise<void> | void): Task
+
+interface TaskOptions {
+  desc?: string
+  hidden?: boolean
+  alias?: string | string[]
+}
+
+interface TaskContext {
+  sh: Shell
+}
+```
+
+`task` creates a task from a function. See [Tasks](#tasks) and [Task options](#task-options).
+
+- The function receives a `TaskContext` with its own [`sh`](#running-commands)
+
+---
+
+### `Task` Type
+
+```ts
+interface Task {
+  (): Promise<void>
+  options: TaskOptions
+  before: (...fns: ((ctx: TaskContext) => Promise<void> | void)[]) => void
+  after: (...fns: ((ctx: TaskContext) => Promise<void> | void)[]) => void
+}
+```
+
+A `Task` is a function. Calling it runs the task (and its hooks) or, if it already ran, returns the same result.
+
+- `options` is the `TaskOptions` object passed to `task`
+- `before` and `after` add [hooks](#extending-tasks)
+
+---
+
+### `list` Task
+
+The built-in task that prints the task list. It runs for `bask --list`, or for `bask` when there's no default export.
+
+You can add hooks to it like any other task:
+
+```ts
+list.before(() => {
+  console.log("My project's tasks:\n")
+})
+```
+
+---
+
+### `isTask` Function
+
+```ts
+function isTask(value: unknown): value is Task
+```
+
+`isTask` checks if a value was created by `task`.
