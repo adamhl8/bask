@@ -1,3 +1,21 @@
+## [0.4.0](https://github.com/adamhl8/bask/compare/v0.3.0..v0.4.0) - 2026-10-18
+
+### ✨ Improvements
+
+- exit with error when bask.ts is exectuted directly ([ced2624](https://github.com/adamhl8/bask/commit/ced262483f240376cd39451c8b7d97aa2229447f) by @adamhl8)
+
+### ⚙️ Miscellaneous Tasks
+
+- add tests ([6d40892](https://github.com/adamhl8/bask/commit/6d40892ed419adddb101ca8a03ccc11b008dcfa8) by @adamhl8)
+
+### 📚 Documentation
+
+- update readme ([e52cdff](https://github.com/adamhl8/bask/commit/e52cdfffd5ca881b5832299ed55a66d76588cdf3) by @adamhl8)
+
+- update readme ([ae3c00b](https://github.com/adamhl8/bask/commit/ae3c00bb162eaf3f3d28f5cab6c09720d23a6265) by @adamhl8)
+
+- update readme ([20f0441](https://github.com/adamhl8/bask/commit/20f04419aab957222ac93e51b16c7e4483322387) by @adamhl8)
+
 ## [0.3.0](https://github.com/adamhl8/bask/compare/v0.2.0..v0.3.0) - 2026-10-18
 
 ### 🚀 Features
