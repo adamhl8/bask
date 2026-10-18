@@ -1,20 +1,16 @@
 #!/usr/bin/env bun
 
 import path from "node:path"
-import { parseArgs, styleText } from "node:util"
+import { parseArgs } from "node:util"
 
 import bun from "bun"
 
 import { BaskFileError, formatTaskList, getTaskIndex, list, setBaskModule } from "#registry.ts"
 import { getFailedTask } from "#task.ts"
 import type { Task } from "#task.ts"
+import { printError } from "#utils.ts"
 
 const isModule = (value: unknown): value is Record<string, unknown> => typeof value === "object" && Boolean(value)
-
-// Write to `process.stderr` directly because Bun colors all `console.error` output red in a terminal.
-const printError = (message: string) => {
-  process.stderr.write(`${styleText(["bold", "red"], "error:", { stream: process.stderr })} ${message}\n`)
-}
 
 const isParseArgsError = (error: unknown): error is TypeError & { code: string } =>
   error instanceof TypeError &&
