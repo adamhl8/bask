@@ -116,7 +116,7 @@ export const hello = task(() => {
 
 ```ts
 export const releaseRun = task({ desc: "Run from CI", hidden: true }, async ({ sh }) => {
-  await sh`bun release-it --ci`
+  await sh`release-it --ci`
 })
 
 export const bumpDeps = task({ alias: ["up", "update-deps"] }, async ({ sh }) => {
@@ -234,6 +234,9 @@ export const lint = task(async ({ sh }) => {
 })
 ```
 
+> [!TIP]
+> Like a `package.json` script, `sh` finds installed bins in `node_modules/.bin`, so `oxlint` and `bun oxlint` both work.
+
 To run a command without printing it, use `.echo(false)`:
 
 ```ts
@@ -321,11 +324,11 @@ import { build, lint } from "./shared-tasks.ts"
 export * from "./shared-tasks.ts"
 
 export const astroSync = task(async ({ sh }) => {
-  await sh`bun astro sync`
+  await sh`astro sync`
 })
 
 export const astroBuild = task(async ({ sh }) => {
-  await sh`bun astro build`
+  await sh`astro build`
 })
 
 lint.before(astroSync)

@@ -1,9 +1,16 @@
 import { describe, expect, it, setDefaultTimeout } from "bun:test"
 import fs from "node:fs/promises"
+import path from "node:path"
 
 import { createProject } from "#__tests__/utils.ts"
 
 setDefaultTimeout(30_000)
+
+const writeBin = async (dir: string, name: string, output: string) => {
+  const binDir = path.join(dir, "node_modules/.bin")
+  await fs.mkdir(binDir, { recursive: true })
+  await fs.writeFile(path.join(binDir, name), `#!/bin/sh\necho ${output}\n`, { mode: 0o755 })
+}
 
 describe("exit codes", () => {
   it("keeps going after a failed command with nothrow", async () => {
@@ -154,5 +161,21 @@ describe("settings", () => {
 
     expect(stdout).toBe(`greeting=\n${await fs.realpath(dir)}`)
     expect(stderr).toBe("echo greeting=$GREETING\npwd")
+  })
+})
+
+describe("PATH", () => {
+  it("finds commands in node_modules/.bin of the current folder and its parents, nearest first", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/bin-path" })
+    const nested = path.join(dir, "nested")
+    await writeBin(dir, "outer", "outer")
+    await writeBin(dir, "both", "outer both")
+    await writeBin(nested, "inner", "inner")
+    await writeBin(nested, "both", "inner both")
+
+    // Start bask through its `.bin` link because `preferLocal` and package managers put `.bin` on `PATH` themselves.
+    const { stdout } = await run({ cwd: nested, preferLocal: false })`${path.join(dir, "node_modules/.bin/bask")} bins`
+
+    expect(stdout).toBe("inner\nouter\ninner both")
   })
 })

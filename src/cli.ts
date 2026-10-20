@@ -10,6 +10,8 @@ import { getFailedTask } from "#task.ts"
 import type { Task } from "#task.ts"
 import { printError } from "#utils.ts"
 
+const cwd = process.cwd()
+
 const isModule = (value: unknown): value is Record<string, unknown> => typeof value === "object" && Boolean(value)
 
 const isParseArgsError = (error: unknown): error is TypeError & { code: string } =>
@@ -21,10 +23,23 @@ const isParseArgsError = (error: unknown): error is TypeError & { code: string }
 /** Finds the project's own bask CLI, so a global `bask` runs the version the project pins. */
 const resolveLocalCli = () => {
   try {
-    return bun.resolveSync("@adamhl8/bask/cli", process.cwd())
+    return bun.resolveSync("@adamhl8/bask/cli", cwd)
   } catch {
     return
   }
+}
+
+/** Lists `node_modules/.bin` for `dir` and each of its parents, nearest first. */
+const getBinDirs = (dir: string): string[] => {
+  const binDir = path.join(dir, "node_modules", ".bin")
+  const parent = path.dirname(dir)
+  return parent === dir ? [binDir] : [binDir, ...getBinDirs(parent)]
+}
+
+/** Prepends the project's `.bin` folders to `PATH`, like `bun run` does, so tasks can run installed bins by name. */
+const addBinDirsToPath = () => {
+  // oxlint-disable-next-line node/no-process-env - commands in `sh` look up bins on this `PATH`
+  process.env["PATH"] = [...getBinDirs(cwd), process.env["PATH"]].filter(Boolean).join(path.delimiter)
 }
 
 const parseCliArgs = () => {
@@ -70,13 +85,14 @@ const main = async () => {
   if (!args) return
   const { values, positionals } = args
 
-  const baskPath = path.resolve("bask.ts")
+  const baskPath = path.join(cwd, "bask.ts")
   if (!(await bun.file(baskPath).exists())) {
-    printError(`no bask.ts in ${process.cwd()}`)
+    printError(`no bask.ts in ${cwd}`)
     process.exitCode = 1
     return
   }
 
+  addBinDirsToPath()
   const baskModule: unknown = await import(baskPath)
   if (!isModule(baskModule)) throw new Error("failed to import bask.ts")
   try {
