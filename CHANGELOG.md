@@ -1,3 +1,9 @@
+## [0.5.0](https://github.com/adamhl8/bask/compare/v0.4.0..v0.5.0) - 2026-10-20
+
+### 🚀 Features
+
+- resolve node_modules bins ([b69ab16](https://github.com/adamhl8/bask/commit/b69ab167b97ff63ab0acfa021d15a6e30c5e9877) by @adamhl8)
+
 ## [0.4.0](https://github.com/adamhl8/bask/compare/v0.3.0..v0.4.0) - 2026-10-18
 
 ### ✨ Improvements
