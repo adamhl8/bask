@@ -6,6 +6,8 @@ import { createProject } from "#__tests__/utils.ts"
 
 setDefaultTimeout(30_000)
 
+const STACK_FRAME = /at .*bask\.ts:\d+:\d+/v
+
 const TASK_LIST = `Available tasks:
     build     # Build the project [default] [alias: b]
     bump-deps # [aliases: up, update-deps]
@@ -183,6 +185,6 @@ describe("failures", () => {
 
     expect(exitCode).toBe(1)
     expect(all).toContain("error: task bug")
-    expect(all).toMatch(/at .*bask\.ts:\d+:\d+/v)
+    expect(all).toMatch(STACK_FRAME)
   })
 })

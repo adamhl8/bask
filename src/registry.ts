@@ -20,8 +20,10 @@ export class BaskFileError extends Error {
 
 let taskIndex: TaskIndex | undefined
 
+const collator = new Intl.Collator()
+
 const toKebabCase = (name: string) => name.replaceAll(/[A-Z]/gv, (match) => `-${match.toLowerCase()}`)
-const toCamelCase = (name: string) => name.replaceAll(/-[a-z\d]/gv, (match) => match.slice(1).toUpperCase())
+const toCamelCase = (name: string) => name.replaceAll(/-[\da-z]/gv, (match) => match.slice(1).toUpperCase())
 
 /** Formats one problem as a single line, or several under a count with one per line. */
 const formatProblems = (problems: string[]) => {
@@ -117,7 +119,7 @@ export const formatTaskList = () => {
       const comment = [entry.task.options.desc, defaultMarker, formatAliases(entry.aliases)].filter(Boolean).join(" ")
       return { name: entry.name, comment }
     })
-    .toSorted((a, b) => a.name.localeCompare(b.name))
+    .toSorted((a, b) => collator.compare(a.name, b.name))
 
   const nameWidth = Math.max(...rows.map((row) => row.name.length))
   const lines = rows.map(({ name, comment }) =>

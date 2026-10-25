@@ -84,7 +84,7 @@ export const reset = task(async ({ sh }) => {
 
 export const processEnv = task(async ({ sh }) => {
   const command = sh`echo greeting=$GREETING`.echo(false)
-  // oxlint-disable-next-line node/no-process-env - a change after the command is created is what's under test
+  // Set `GREETING` after creating the command, because that change is what's under test.
   process.env["GREETING"] = "set later"
   await command
 })
@@ -105,4 +105,22 @@ export const catchFinally = task(async ({ sh }) => {
   await sh`echo done`.finally(() => {
     console.log("finally")
   })
+})
+
+export const bunToggle = task(async ({ sh }) => {
+  sh.echo(false)
+  await sh`runtime`
+  await sh`runtime`.bun(false)
+  sh.bun(false)
+  await sh`runtime`
+  await sh`runtime`.bun(true)
+})
+
+export const bunEnv = task(async ({ sh }) => {
+  // Spread `process.env` to keep `PATH`, because the shim needs a `PATH` to join.
+  await sh`runtime`.env({ ...process.env, GREETING: "hi" }).echo(false)
+})
+
+export const bunOff = task(async ({ sh }) => {
+  await sh`runtime`.bun(false).echo(false)
 })

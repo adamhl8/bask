@@ -236,6 +236,8 @@ export const lint = task(async ({ sh }) => {
 
 > [!TIP]
 > Like a `package.json` script, `sh` finds installed bins in `node_modules/.bin`, so `oxlint` and `bun oxlint` both work.
+>
+> By default, `sh` runs `node_modules` bins and other `node` commands under Bun, like Bun's `--bun` flag. To use the real Node, see `.bun()` in [Shell settings](#shell-settings).
 
 To run a command without printing it, use `.echo(false)`:
 
@@ -259,6 +261,8 @@ The following methods can be used on the `sh` instance _or_ on each command.
 - `.nothrow()` - Doesn't throw an error when a command exits with a non-zero exit code
 - `.throws()` - Sets whether a non-zero exit code throws an error
 - `.echo()` - Sets whether the command is printed before it runs
+- `.bun()` - Sets whether `node_modules` bins and other `node` commands run under Bun (on by default)
+  - Turn it off for a tool that doesn't work on Bun: ``sh`some-tool`.bun(false)``
 
 Each task gets its own fresh instance of `sh`, so changes to `sh` do not affect other tasks' `sh`. Using the above methods on `sh` will apply to every command after the call in the task.
 

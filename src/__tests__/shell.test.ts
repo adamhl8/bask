@@ -2,15 +2,21 @@ import { describe, expect, it, setDefaultTimeout } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 
+import bun from "bun"
+
 import { createProject } from "#__tests__/utils.ts"
 
 setDefaultTimeout(30_000)
 
-const writeBin = async (dir: string, name: string, output: string) => {
-  const binDir = path.join(dir, "node_modules/.bin")
-  await fs.mkdir(binDir, { recursive: true })
-  await fs.writeFile(path.join(binDir, name), `#!/bin/sh\necho ${output}\n`, { mode: 0o755 })
+const writeBin = async (dir: string, name: string, script: string) => {
+  const binPath = path.join(dir, "node_modules/.bin", name)
+  await bun.write(binPath, script)
+  // Set the mode with `chmod` because `Bun.write` ignores its `mode` option.
+  await fs.chmod(binPath, 0o755)
 }
+
+const echoScript = (output: string) => `#!/bin/sh\necho ${output}\n`
+const runtimeScript = `#!/usr/bin/env node\nconsole.log(process.versions.bun ? "bun" : "node")\n`
 
 describe("exit codes", () => {
   it("keeps going after a failed command with nothrow", async () => {
@@ -168,14 +174,43 @@ describe("PATH", () => {
   it("finds commands in node_modules/.bin of the current folder and its parents, nearest first", async () => {
     const { dir, run } = await createProject({ baskFile: "shell/bin-path" })
     const nested = path.join(dir, "nested")
-    await writeBin(dir, "outer", "outer")
-    await writeBin(dir, "both", "outer both")
-    await writeBin(nested, "inner", "inner")
-    await writeBin(nested, "both", "inner both")
+    await writeBin(dir, "outer", echoScript("outer"))
+    await writeBin(dir, "both", echoScript("outer both"))
+    await writeBin(nested, "inner", echoScript("inner"))
+    await writeBin(nested, "both", echoScript("inner both"))
 
     // Start bask through its `.bin` link because `preferLocal` and package managers put `.bin` on `PATH` themselves.
     const { stdout } = await run({ cwd: nested, preferLocal: false })`${path.join(dir, "node_modules/.bin/bask")} bins`
 
     expect(stdout).toBe("inner\nouter\ninner both")
+  })
+})
+
+describe("node", () => {
+  it("runs node with Bun unless bun is off for the command or the shell", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/shell.ts" })
+    await writeBin(dir, "runtime", runtimeScript)
+
+    const { stdout } = await run`bask bun-toggle`
+
+    expect(stdout).toBe("bun\nnode\nnode\nbun")
+  })
+
+  it("runs node with Bun when env() replaces the environment", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/shell.ts" })
+    await writeBin(dir, "runtime", runtimeScript)
+
+    const { stdout } = await run`bask bun-env`
+
+    expect(stdout).toBe("bun")
+  })
+
+  it("runs the real node with bun(false) when bask starts under Bun's own node shim", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/shell.ts" })
+    await writeBin(dir, "runtime", runtimeScript)
+
+    const { stdout } = await run`bunx --bun bask bun-off`
+
+    expect(stdout).toBe("node")
   })
 })

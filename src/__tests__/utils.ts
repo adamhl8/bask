@@ -29,7 +29,6 @@ export const packBask = async () => {
   tarball = stdout
 }
 
-// oxlint-disable-next-line node/no-process-env - the CLI subprocesses need the real `PATH` and `HOME`
 const { PATH, HOME } = process.env
 // Pass `HOME` so bun uses its normal cache.
 const env = { PATH, HOME }

@@ -1,5 +1,5 @@
-import { createShell } from "#shell.ts"
-import type { Shell } from "#shell.ts"
+import { createShell } from "#shell/shell.ts"
+import type { Shell } from "#shell/shell.ts"
 
 type AsyncOrSyncReturn = Promise<void> | void
 

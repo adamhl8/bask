@@ -15,10 +15,10 @@ const cwd = process.cwd()
 const isModule = (value: unknown): value is Record<string, unknown> => typeof value === "object" && Boolean(value)
 
 const isParseArgsError = (error: unknown): error is TypeError & { code: string } =>
-  error instanceof TypeError &&
-  "code" in error &&
-  typeof error.code === "string" &&
-  error.code.startsWith("ERR_PARSE_ARGS_")
+  error instanceof TypeError
+  && "code" in error
+  && typeof error.code === "string"
+  && error.code.startsWith("ERR_PARSE_ARGS_")
 
 /** Finds the project's own bask CLI, so a global `bask` runs the version the project pins. */
 const resolveLocalCli = () => {
@@ -38,7 +38,6 @@ const getBinDirs = (dir: string): string[] => {
 
 /** Prepends the project's `.bin` folders to `PATH`, like `bun run` does, so tasks can run installed bins by name. */
 const addBinDirsToPath = () => {
-  // oxlint-disable-next-line node/no-process-env - commands in `sh` look up bins on this `PATH`
   process.env["PATH"] = [...getBinDirs(cwd), process.env["PATH"]].filter(Boolean).join(path.delimiter)
 }
 
