@@ -1,3 +1,19 @@
+## [0.6.0](https://github.com/adamhl8/bask/compare/v0.5.0..v0.6.0) - 2026-10-26
+
+### 🚀 Features
+
+- add .bun() method ([18f2d00](https://github.com/adamhl8/bask/commit/18f2d0069ef1bd55ac5644a86ccdcb67306c48f6) by @adamhl8)
+
+### ✨ Improvements
+
+- clean up and improve shell/environment handling ([ce037bd](https://github.com/adamhl8/bask/commit/ce037bdc163dfd14d1efa32eb755d73adb065045) by @adamhl8)
+
+### ⚙️ Miscellaneous Tasks
+
+- add tests ([120738f](https://github.com/adamhl8/bask/commit/120738f03ade2c383c6ebe65f630bad54519dde1) by @adamhl8)
+
+- _(deps)_ update dependencies ([86ac8fe](https://github.com/adamhl8/bask/commit/86ac8fe2388fc70b3baeb40f936a5e48941e5533) by @adamhl8)
+
 ## [0.5.0](https://github.com/adamhl8/bask/compare/v0.4.0..v0.5.0) - 2026-10-20
 
 ### 🚀 Features
