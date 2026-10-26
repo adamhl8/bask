@@ -22,7 +22,7 @@ describe("exit codes", () => {
   it("keeps going after a failed command with nothrow", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { stdout, stderr, exitCode } = await run({ reject: false })`bask tolerant`
+    const { stdout, stderr, exitCode } = await run`bask tolerant`.nothrow()
 
     expect(exitCode).toBe(0)
     expect(stdout).toBe("kept going")
@@ -32,7 +32,7 @@ describe("exit codes", () => {
   it("keeps going after every failed command with sh.nothrow()", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { stdout, stderr, exitCode } = await run({ reject: false })`bask shell-nothrow`
+    const { stdout, stderr, exitCode } = await run`bask shell-nothrow`.nothrow()
 
     expect(exitCode).toBe(0)
     expect(stdout).toBe("kept going")
@@ -42,7 +42,7 @@ describe("exit codes", () => {
   it("lets a command's throws() override the shell's", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { stdout, stderr, exitCode } = await run({ reject: false })`bask throws-toggle`
+    const { stdout, stderr, exitCode } = await run`bask throws-toggle`.nothrow()
 
     expect(exitCode).toBe(5)
     expect(stdout).toBe("kept going")
@@ -52,7 +52,7 @@ describe("exit codes", () => {
   it("handles a failed command with catch() and runs finally()", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { stdout, stderr, exitCode } = await run({ reject: false })`bask catch-finally`
+    const { stdout, stderr, exitCode } = await run`bask catch-finally`.nothrow()
 
     expect(exitCode).toBe(0)
     expect(stdout).toBe("caught\ndone\nfinally")
@@ -73,8 +73,8 @@ describe("printing commands", () => {
   it("prints each command before its output", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    // Run through `sh` so stdout and stderr share one pipe and keep the order they were written in.
-    const { stdout } = await run`sh -c ${"bask echo 2>&1"}`
+    // Redirect stderr into stdout so both share one pipe and keep the order they were written in.
+    const { stdout } = await run`bask echo 2>&1`
 
     expect(stdout).toBe("echo one\none\ntwo\nthree\necho four\nfour")
   })
@@ -131,33 +131,33 @@ describe("settings", () => {
     // Compare against the real path because macOS reports the temp dir under /private.
     const realDir = await fs.realpath(dir)
 
-    const { all } = await run`bask cwd`
+    const { stdout } = await run`bask cwd`
 
-    expect(all).toBe(`${realDir}/sub\n${realDir}/sub/inner\n${realDir}`)
+    expect(stdout).toBe(`${realDir}/sub\n${realDir}/sub/inner\n${realDir}`)
   })
 
   it("adds to the environment with env(), and removes a variable set to undefined", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { all } = await run`bask env`
+    const { stdout } = await run`bask env`
 
-    expect(all).toBe(`greeting=hi home=${process.env["HOME"]}\ngreeting=hello\ngreeting=hi home=`)
+    expect(stdout).toBe(`greeting=hi home=${process.env["HOME"]}\ngreeting=hello\ngreeting=hi home=`)
   })
 
   it("resets cwd and env when they're called with no argument", async () => {
     const { dir, run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { all } = await run`bask reset`
+    const { stdout } = await run`bask reset`
 
-    expect(all).toBe(`greeting=\n${await fs.realpath(dir)}`)
+    expect(stdout).toBe(`greeting=\n${await fs.realpath(dir)}`)
   })
 
   it("starts from process.env as it was when bask.ts loaded, and passes later changes with env(process.env)", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
-    const { all } = await run`bask process-env`
+    const { stdout } = await run`bask process-env`
 
-    expect(all).toBe("greeting= loaded=at load\ngreeting=set later")
+    expect(stdout).toBe("greeting= loaded=at load\ngreeting=set later")
   })
 
   it("keeps settings from other tasks and hooks out of a task's shell", async () => {
@@ -184,7 +184,7 @@ describe("quiet", () => {
     async (taskName) => {
       const { run } = await createProject({ baskFile: "shell/quiet" })
 
-      const { stdout, stderr, exitCode } = await run({ reject: false })`bask ${taskName}`
+      const { stdout, stderr, exitCode } = await run`bask ${taskName}`.nothrow()
 
       expect(exitCode).toBe(3)
       expect(stdout).toBe("out")
@@ -195,7 +195,7 @@ describe("quiet", () => {
   it("doesn't print a failed command's output again when it was already shown", async () => {
     const { run } = await createProject({ baskFile: "shell/quiet" })
 
-    const { stdout, stderr } = await run({ reject: false })`bask shown-failure`
+    const { stdout, stderr } = await run`bask shown-failure`.nothrow()
 
     expect(stdout).toBe("out")
     expect(stderr).toBe("err\nerror: task 'shown-failure' failed with exit code 3")
@@ -204,9 +204,9 @@ describe("quiet", () => {
   it("doesn't print the hidden output of a failure that a task catches", async () => {
     const { run } = await createProject({ baskFile: "shell/quiet" })
 
-    const { all } = await run`bask caught`
+    const { stdout } = await run`bask caught`
 
-    expect(all).toBe("caught")
+    expect(stdout).toBe("caught")
   })
 })
 
@@ -219,8 +219,8 @@ describe("PATH", () => {
     await writeBin(nested, "inner", echoScript("inner"))
     await writeBin(nested, "both", echoScript("inner both"))
 
-    // Start bask through its `.bin` link because `preferLocal` and package managers put `.bin` on `PATH` themselves.
-    const { stdout } = await run({ cwd: nested, preferLocal: false })`${path.join(dir, "node_modules/.bin/bask")} bins`
+    // Start bask through its `.bin` link because `localBins` and package managers put `.bin` on `PATH` themselves.
+    const { stdout } = await run`${path.join(dir, "node_modules/.bin/bask")} bins`.cwd(nested).localBins(false)
 
     expect(stdout).toBe("inner\nouter\ninner both")
   })
@@ -273,7 +273,7 @@ describe("baskConfig", () => {
     await writeBin(dir, "runtime", runtimeScript)
     const realDir = await fs.realpath(dir)
 
-    const { stdout, stderr, exitCode } = await run({ reject: false })`bask overrides`
+    const { stdout, stderr, exitCode } = await run`bask overrides`.nothrow()
 
     expect(exitCode).toBe(3)
     expect(stdout).toBe(`greeting=from sh\ngreeting=from command\n${realDir}\nbun`)
@@ -295,8 +295,8 @@ describe("baskConfig", () => {
     await writeBin(dir, "runtime", runtimeScript)
     const realDir = await fs.realpath(dir)
 
-    const { all } = await run`bask reset`
+    const { stdout } = await run`bask reset`
 
-    expect(all).toBe(`${realDir}/sub\ngreeting=from config`)
+    expect(stdout).toBe(`${realDir}/sub\ngreeting=from config`)
   })
 })

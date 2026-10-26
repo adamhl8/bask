@@ -8,33 +8,33 @@ describe("sharing tasks", () => {
   it("lists re-exported tasks alongside the local ones", async () => {
     const { run } = await createProject({ baskFile: "sharing/re-exports" })
 
-    const { all } = await run`bask -l`
+    const { stdout } = await run`bask -l`
 
-    expect(all).toBe("Available tasks:\n    build  # [default]\n    bundle\n    lint\n    sync")
+    expect(stdout).toBe("Available tasks:\n    build  # [default]\n    bundle\n    lint\n    sync")
   })
 
   it("runs a hook on a shared task when another shared task calls it", async () => {
     const { run } = await createProject({ baskFile: "sharing/re-exports" })
 
-    const { all } = await run`bask build`
+    const { stdout } = await run`bask build`
 
-    expect(all).toBe("ran sync\nran lint\nran build\nran bundle")
+    expect(stdout).toBe("ran sync\nran lint\nran build\nran bundle")
   })
 
   it("runs a default re-exported by name", async () => {
     const { run } = await createProject({ baskFile: "sharing/re-exports" })
 
-    const { all } = await run`bask`
+    const { stdout } = await run`bask`
 
-    expect(all).toBe("ran sync\nran lint\nran build\nran bundle")
+    expect(stdout).toBe("ran sync\nran lint\nran build\nran bundle")
   })
 
   it("doesn't re-export the default with export *", async () => {
     const { run } = await createProject({ baskFile: "sharing/no-default" })
 
-    const { all } = await run`bask`
+    const { stdout } = await run`bask`
 
-    expect(all).toBe("Available tasks:\n    build\n    lint")
+    expect(stdout).toBe("Available tasks:\n    build\n    lint")
   })
 
   it("applies a baskConfig re-exported with export *", async () => {

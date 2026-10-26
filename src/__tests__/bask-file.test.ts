@@ -49,19 +49,19 @@ describe("bask.ts validation", () => {
   ])("fails on %s", async (_, baskFile, message) => {
     const { run } = await createProject({ baskFile })
 
-    const { all, exitCode } = await run({ reject: false })`bask`
+    const { stderr, exitCode } = await run`bask`.nothrow()
 
     expect(exitCode).toBe(1)
-    expect(all).toBe(`error: ${message}`)
+    expect(stderr).toBe(`error: ${message}`)
   })
 
   it("reports every problem at once", async () => {
     const { run } = await createProject({ baskFile: "bask-file/many-problems.ts" })
 
-    const { all, exitCode } = await run({ reject: false })`bask`
+    const { stderr, exitCode } = await run`bask`.nothrow()
 
     expect(exitCode).toBe(1)
-    expect(all).toBe(`error: bask.ts has 3 problems:
+    expect(stderr).toBe(`error: bask.ts has 3 problems:
   the default export isn't a task. Wrap it in task().
   task 'compile' is also exported as 'build'. Use the alias option instead.
   task 'build' can't use 'default' as an alias. Export it as the default instead.`)
@@ -70,8 +70,8 @@ describe("bask.ts validation", () => {
   it("allows an alias that repeats the task's own name", async () => {
     const { run } = await createProject({ baskFile: "bask-file/alias-repeats-name.ts" })
 
-    const { all: list } = await run`bask -l`
-    const { all: output } = await run`bask b`
+    const { stdout: list } = await run`bask -l`
+    const { stdout: output } = await run`bask b`
 
     expect(list).toBe("Available tasks:\n    build # [alias: b]")
     expect(output).toBe("ran build")
@@ -80,8 +80,8 @@ describe("bask.ts validation", () => {
   it("ignores exports that aren't tasks", async () => {
     const { run } = await createProject({ baskFile: "bask-file/non-task-exports.ts" })
 
-    const { all: list } = await run`bask -l`
-    const { exitCode } = await run({ reject: false })`bask helper`
+    const { stdout: list } = await run`bask -l`
+    const { exitCode } = await run`bask helper`.nothrow()
 
     expect(list).toBe("Available tasks:\n    build")
     expect(exitCode).toBe(1)

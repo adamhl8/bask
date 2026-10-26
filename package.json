@@ -48,16 +48,18 @@
     "access": "public"
   },
   "scripts": {
-    "prepare": "tsdown && bun install --ignore-scripts --no-summary && bunx bask prepare"
+    "prepare": "tsdown && bun install --ignore-scripts --no-summary && bask prepare"
+  },
+  "dependencies": {
+    "ts-explicit-errors": "^5.0.0"
   },
   "devDependencies": {
     "@adamhl8/bask": "file:.",
-    "@adamhl8/configs": "^3.1.1",
+    "@adamhl8/configs": "^3.2.0",
     "@arethetypeswrong/core": "^0.18.5",
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@types/bun": "^1.4.4",
-    "execa": "^10.2.1",
     "knip": "^6.43.0",
     "markdown-toc": "^1.2.0",
     "oxfmt": "^0.74.0",
@@ -71,8 +73,5 @@
   },
   "engines": {
     "bun": ">=1.4"
-  },
-  "dependencies": {
-    "ts-explicit-errors": "^5.0.0"
   }
 }
