@@ -1,3 +1,7 @@
+import { err } from "ts-explicit-errors"
+
+import { getLoadedBaskFile } from "#bask-file/loaded.ts"
+import type { ShellConfig } from "#config.ts"
 import { createShell } from "#shell/shell.ts"
 import type { Shell } from "#shell/shell.ts"
 
@@ -24,12 +28,10 @@ export interface Task {
   after: (...fns: TaskFn[]) => void
 }
 
-const tasks = new WeakSet<object>()
+const createdByTask = new WeakSet<object>()
+export const isTask = (value: unknown): value is Task => typeof value === "function" && createdByTask.has(value)
 
-export const isTask = (value: unknown): value is Task => typeof value === "function" && tasks.has(value)
-
-const failedTasks = new WeakMap<Error, object>()
-
+const failedTasks = new WeakMap<Error, Task>()
 /** Returns the innermost task that the error failed, so the CLI can name it. */
 export const getFailedTask = (error: Error) => failedTasks.get(error)
 
@@ -62,11 +64,11 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
     afterFns.push(...fns)
   }
 
-  // Give each hook and the task its own shell so settings like `sh.cwd()` stay inside the function that made them.
-  const runWithShell = async (taskFn: TaskFn) => taskFn({ sh: createShell() })
-
-  const runAll = async () => {
+  const runAll = async (shellConfig: ShellConfig) => {
     hasStarted = true
+    // Give each hook and the task its own shell so settings like `sh.cwd()` stay inside the function that made them.
+    const runWithShell = async (taskFn: TaskFn) => taskFn({ sh: createShell(shellConfig) })
+
     // oxlint-disable-next-line no-await-in-loop - hooks run in order
     for (const beforeFn of beforeFns) await runWithShell(beforeFn)
     await runWithShell(fn)
@@ -75,19 +77,35 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
   }
 
   // Assign `runPromise` before any await so a concurrent call can't start a second run.
-  const run = async () => {
-    runPromise ??= runAll()
+  const runOnce = async (shellConfig: ShellConfig) => {
+    runPromise ??= runAll(shellConfig)
     try {
       await runPromise
     } catch (error) {
-      // Record `run` only if no task has yet, because the innermost task's catch runs first.
-      // `run` is the same object as the returned task.
-      if (error instanceof Error && !failedTasks.has(error)) failedTasks.set(error, run)
+      // Record this task only if no task has yet, because the innermost task's catch runs first.
+      // oxlint-disable-next-line no-use-before-define - `runOnce` only runs after `newTask` is assigned
+      if (error instanceof Error && !failedTasks.has(error)) failedTasks.set(error, newTask)
       throw error
     }
   }
 
+  // Reject a task called at the top level of `bask.ts`, because the CLI hasn't finished loading it yet.
+  // Throw synchronously so the import of `bask.ts` fails, even without `await`.
+  // oxlint-disable-next-line typescript/promise-function-async - an async function would turn the throw into a rejection
+  const run = () => {
+    const baskFile = getLoadedBaskFile()
+    if (!baskFile) {
+      throw err(
+        "a task ran while bask.ts was loading. Call tasks from inside other tasks, not at the top level.",
+        undefined,
+        { invalidBaskFile: true },
+      )
+    }
+
+    return runOnce(baskFile.config.shell)
+  }
+
   const newTask: Task = Object.assign(run, { options, before, after })
-  tasks.add(newTask)
+  createdByTask.add(newTask)
   return newTask
 }

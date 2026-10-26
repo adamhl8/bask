@@ -187,4 +187,18 @@ describe("failures", () => {
     expect(all).toContain("error: task bug")
     expect(all).toMatch(STACK_FRAME)
   })
+
+  it.each([
+    ["with", "cli/top-level-call.ts"],
+    ["without", "cli/top-level-call-unawaited.ts"],
+  ])("fails when bask.ts runs a task at its top level %s await", async (_, baskFile) => {
+    const { run } = await createProject({ baskFile })
+
+    const { all, exitCode } = await run({ reject: false })`bask build`
+
+    expect(exitCode).toBe(1)
+    expect(all).toBe(
+      "error: a task ran while bask.ts was loading. Call tasks from inside other tasks, not at the top level.",
+    )
+  })
 })

@@ -30,7 +30,7 @@ const isNodeShimDir = (dir: string) => NODE_SHIM_DIR.test(path.basename(dir))
 const getPathDirsWithoutShims = (PATH: string) => PATH.split(path.delimiter).filter((dir) => !isNodeShimDir(dir))
 
 /** Takes every `node` shim off `PATH` so `node` is the real Node. */
-export const removeNodeShims = (env: NonNullable<ShellEnv>) => {
+export const removeNodeShims = (env: ShellEnv) => {
   const currentPath = env["PATH"]
   if (currentPath === undefined) return env
 
@@ -40,7 +40,7 @@ export const removeNodeShims = (env: NonNullable<ShellEnv>) => {
 }
 
 /** Puts bask's `node` shim first on `PATH`, in place of any other `node` shim. */
-export const addNodeShim = (env: NonNullable<ShellEnv>) => {
+export const addNodeShim = (env: ShellEnv) => {
   const currentPath = env["PATH"]
   // Skip an env without `PATH` because adding one would change which commands it can find.
   if (currentPath === undefined) return env

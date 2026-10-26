@@ -53,6 +53,7 @@ export const env = task(async ({ sh }) => {
   sh.env({ GREETING: "hi" })
   await sh`echo greeting=$GREETING home=$HOME`
   await sh`echo greeting=$GREETING`.env({ GREETING: "hello" })
+  await sh`echo greeting=$GREETING home=$HOME`.env({ HOME: undefined })
 })
 
 const configure = task(({ sh }) => {
@@ -82,11 +83,12 @@ export const reset = task(async ({ sh }) => {
   await sh`pwd`
 })
 
+process.env["LOADED"] = "at load"
+
 export const processEnv = task(async ({ sh }) => {
-  const command = sh`echo greeting=$GREETING`.echo(false)
-  // Set `GREETING` after creating the command, because that change is what's under test.
   process.env["GREETING"] = "set later"
-  await command
+  await sh`echo greeting=$GREETING loaded=$LOADED`.echo(false)
+  await sh`echo greeting=$GREETING`.env(process.env).echo(false)
 })
 
 export const json = task(async ({ sh }) => {
@@ -117,8 +119,7 @@ export const bunToggle = task(async ({ sh }) => {
 })
 
 export const bunEnv = task(async ({ sh }) => {
-  // Spread `process.env` to keep `PATH`, because the shim needs a `PATH` to join.
-  await sh`runtime`.env({ ...process.env, GREETING: "hi" }).echo(false)
+  await sh`runtime`.env({ GREETING: "hi" }).echo(false)
 })
 
 export const bunOff = task(async ({ sh }) => {

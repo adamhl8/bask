@@ -13,6 +13,8 @@ if (path.basename(bun.main) === "bask.ts") {
   process.exit(1)
 }
 
-export { list } from "#registry.ts"
+export { defineConfig } from "#config.ts"
+export type { BaskConfigInput } from "#config.ts"
+export { list } from "#bask-file/list.ts"
 export { isTask, task } from "#task.ts"
 export type { Task } from "#task.ts"

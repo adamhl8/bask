@@ -252,12 +252,16 @@ See the [Bun Shell docs](https://bun.sh/docs/runtime/shell) for the full API.
 
 ### Shell settings
 
-The following methods can be used on the `sh` instance _or_ on each command.
+The following methods can be used on the `sh` instance _or_ on each command. To set them for every shell, see [Project-wide shell settings](#project-wide-shell-settings).
 
 - `.cwd()` - Changes the working directory
   - Relative paths resolve from the directory you ran `bask` in, not from the `sh` instance's cwd
-- `.env()` - Sets the environment variables
-  - This replaces the whole environment, so spread `process.env` to keep it: `.env({ ...process.env, DEBUG: "1" })`
+- `.env()` - Adds environment variables on top of `process.env`: `.env({ DEBUG: "1" })`
+  - Set a variable to `undefined` to remove it: `.env({ DEBUG: undefined })`
+  - Commands use `process.env` as it was when `bask.ts` finished loading, so later changes to it don't reach them
+  - Pass later changes through with `.env(process.env)`. This also brings back variables removed earlier, so put removals after it: `.env({ ...process.env, DEBUG: undefined })`
+- `.quiet()` - Hides the command's output instead of writing it to the terminal
+  - If a quiet command fails and the error isn't caught, bask prints its output along with the error
 - `.nothrow()` - Doesn't throw an error when a command exits with a non-zero exit code
 - `.throws()` - Sets whether a non-zero exit code throws an error
 - `.echo()` - Sets whether the command is printed before it runs
@@ -275,6 +279,24 @@ export const buildWeb = task(async ({ sh }) => {
   await sh`cp -r packages/web/dist packages/server/public`.cwd(".")
 })
 ```
+
+#### Project-wide shell settings
+
+To change the defaults for every shell, including the ones in task hooks, export `baskConfig` from `bask.ts`:
+
+```ts
+import { defineConfig } from "@adamhl8/bask"
+
+export const baskConfig = defineConfig({
+  shell: { echo: false, bun: false },
+})
+```
+
+`shell` takes `cwd`, `env`, `quiet`, `throws`, `echo`, and `bun`, which work like the methods above. A setting on `sh` overrides `baskConfig`, and a setting on a command overrides both.
+
+- `env` adds to `process.env` as it was when `bask.ts` finished loading, and the `env` of `sh` and of each command add to that
+- `sh.cwd()` and `sh.env()` with no argument go back to the `baskConfig` value
+- A `baskConfig` re-exported with `export *` applies, but a `baskConfig` in `bask.ts` replaces it entirely
 
 ## Extending/sharing tasks
 

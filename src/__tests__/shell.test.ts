@@ -136,12 +136,12 @@ describe("settings", () => {
     expect(all).toBe(`${realDir}/sub\n${realDir}/sub/inner\n${realDir}`)
   })
 
-  it("replaces the whole environment with env()", async () => {
+  it("adds to the environment with env(), and removes a variable set to undefined", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
     const { all } = await run`bask env`
 
-    expect(all).toBe("greeting=hi home=\ngreeting=hello")
+    expect(all).toBe(`greeting=hi home=${process.env["HOME"]}\ngreeting=hello\ngreeting=hi home=`)
   })
 
   it("resets cwd and env when they're called with no argument", async () => {
@@ -152,12 +152,12 @@ describe("settings", () => {
     expect(all).toBe(`greeting=\n${await fs.realpath(dir)}`)
   })
 
-  it("reads process.env when a command runs, not when it's created", async () => {
+  it("starts from process.env as it was when bask.ts loaded, and passes later changes with env(process.env)", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
     const { all } = await run`bask process-env`
 
-    expect(all).toBe("greeting=set later")
+    expect(all).toBe("greeting= loaded=at load\ngreeting=set later")
   })
 
   it("keeps settings from other tasks and hooks out of a task's shell", async () => {
@@ -167,6 +167,46 @@ describe("settings", () => {
 
     expect(stdout).toBe(`greeting=\n${await fs.realpath(dir)}`)
     expect(stderr).toBe("echo greeting=$GREETING\npwd")
+  })
+})
+
+describe("quiet", () => {
+  it("hides output with quiet() at every level", async () => {
+    const { run } = await createProject({ baskFile: "shell/quiet" })
+
+    const { stdout } = await run`bask levels`
+
+    expect(stdout).toBe("shown by sh")
+  })
+
+  it.each(["failure", "text-failure"])(
+    "prints the hidden output of a failed command when its error reaches the CLI: %s",
+    async (taskName) => {
+      const { run } = await createProject({ baskFile: "shell/quiet" })
+
+      const { stdout, stderr, exitCode } = await run({ reject: false })`bask ${taskName}`
+
+      expect(exitCode).toBe(3)
+      expect(stdout).toBe("out")
+      expect(stderr).toBe(`err\nerror: task '${taskName}' failed with exit code 3`)
+    },
+  )
+
+  it("doesn't print a failed command's output again when it was already shown", async () => {
+    const { run } = await createProject({ baskFile: "shell/quiet" })
+
+    const { stdout, stderr } = await run({ reject: false })`bask shown-failure`
+
+    expect(stdout).toBe("out")
+    expect(stderr).toBe("err\nerror: task 'shown-failure' failed with exit code 3")
+  })
+
+  it("doesn't print the hidden output of a failure that a task catches", async () => {
+    const { run } = await createProject({ baskFile: "shell/quiet" })
+
+    const { all } = await run`bask caught`
+
+    expect(all).toBe("caught")
   })
 })
 
@@ -196,7 +236,7 @@ describe("node", () => {
     expect(stdout).toBe("bun\nnode\nnode\nbun")
   })
 
-  it("runs node with Bun when env() replaces the environment", async () => {
+  it("runs node with Bun when env() adds variables", async () => {
     const { dir, run } = await createProject({ baskFile: "shell/shell.ts" })
     await writeBin(dir, "runtime", runtimeScript)
 
@@ -212,5 +252,51 @@ describe("node", () => {
     const { stdout } = await run`bunx --bun bask bun-off`
 
     expect(stdout).toBe("node")
+  })
+})
+
+describe("baskConfig", () => {
+  it("applies baskConfig to every task and hook shell", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/config" })
+    await writeBin(dir, "runtime", runtimeScript)
+    const realDir = await fs.realpath(dir)
+
+    const { stdout, stderr, exitCode } = await run`bask defaults`
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe(`hook greeting=from config\n${realDir}/sub\ngreeting=from config\nnode\nkept going`)
+    expect(stderr).toBe("")
+  })
+
+  it("lets sh and command settings override baskConfig", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/config" })
+    await writeBin(dir, "runtime", runtimeScript)
+    const realDir = await fs.realpath(dir)
+
+    const { stdout, stderr, exitCode } = await run({ reject: false })`bask overrides`
+
+    expect(exitCode).toBe(3)
+    expect(stdout).toBe(`greeting=from sh\ngreeting=from command\n${realDir}\nbun`)
+    expect(stderr).toBe(
+      "echo greeting=$GREETING\npwd\nruntime\nexit 3\nerror: task 'overrides' failed with exit code 3",
+    )
+  })
+
+  it("adds each level's env on top of process.env as it was when bask.ts loaded", async () => {
+    const { run } = await createProject({ baskFile: "shell/config" })
+
+    const { stdout } = await run`bask layers`
+
+    expect(stdout).toBe("from config sh process command")
+  })
+
+  it("resets cwd and env to baskConfig when they're called with no argument", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell/config" })
+    await writeBin(dir, "runtime", runtimeScript)
+    const realDir = await fs.realpath(dir)
+
+    const { all } = await run`bask reset`
+
+    expect(all).toBe(`${realDir}/sub\ngreeting=from config`)
   })
 })

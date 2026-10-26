@@ -1,6 +1,7 @@
 import bun from "bun"
 import type { ShellExpression } from "bun"
 
+import type { ShellConfig } from "#config.ts"
 import { ShellCommand } from "#shell/command.ts"
 import type { ShellEnv } from "#shell/command.ts"
 
@@ -14,27 +15,28 @@ export interface Shell {
    */
   cwd: (newCwd?: string) => Shell
   /**
-   * Change the default environment variables for commands run by this shell.
-   *
-   * @default process.env
+   * Add environment variables for commands run by this shell, on top of `process.env` as it was when `bask.ts` loaded
+   * and `baskConfig`. Set one to `undefined` to remove it. With no argument, go back to the `baskConfig` variables.
    */
   env: (newEnv?: ShellEnv) => Shell
-  /** Configure the shell to not throw an exception on non-zero exit codes. */
+  /** Configure commands run by this shell to only buffer their output instead of also writing it to stdout and stderr. */
+  quiet: (isQuiet?: boolean) => Shell
+  /** Configure commands run by this shell to not throw an exception on non-zero exit codes. */
   nothrow: () => Shell
   /**
-   * Configure whether the shell should throw an exception on non-zero exit codes.
+   * Configure whether commands run by this shell throw an exception on non-zero exit codes.
    *
    * @default true
    */
   throws: (shouldThrow: boolean) => Shell
   /**
-   * Configure whether the shell prints each command before running it.
+   * Configure whether this shell prints each command before running it.
    *
    * @default true
    */
   echo: (shouldEcho: boolean) => Shell
   /**
-   * Configure whether `node_modules` bins and other `node` commands run under Bun (like Bun's `--bun` flag).
+   * Configure whether this shell runs `node_modules` bins and `node` under Bun (like Bun's `--bun` flag).
    *
    * @default true
    */
@@ -50,44 +52,46 @@ const formatExpression = (expression: ShellExpression): string => {
   return bun.$.escape(String(expression))
 }
 
-/** Creates a shell that prints each command to stderr before running it. */
-export const createShell = () => {
-  // Use a separate instance so settings on Bun's global `$` or another shell don't apply here.
+/** Creates a shell that prints each command to stderr before running it, starting from `shellConfig`. */
+export const createShell = (shellConfig: ShellConfig) => {
+  // Use a separate instance so settings on Bun's global `$` don't apply here.
   const bunShell = new bun.$.Shell()
-  // Keep `env` here instead of on `bunShell` because `ShellCommand` passes it when each command runs.
-  let shellEnv: ShellEnv
-  let shouldEcho = true
-  let shouldUseBun = true
+  // Copy `shellConfig` so this shell's changes don't reach other shells.
+  const settings: ShellConfig = { ...shellConfig }
 
   const run = (strings: TemplateStringsArray, ...expressions: ShellExpression[]) => {
     // Use `String.raw` because Bun's `$` also reads the raw template strings.
-    const command = String.raw({ raw: strings.raw }, ...expressions.map(formatExpression)).trim()
-    return new ShellCommand(bunShell(strings, ...expressions), { command, env: shellEnv, shouldEcho, shouldUseBun })
+    const commandString = String.raw({ raw: strings.raw }, ...expressions.map(formatExpression)).trim()
+    return new ShellCommand(bunShell(strings, ...expressions), commandString, settings)
   }
 
   const shell: Shell = Object.assign(run, {
     cwd: (newCwd?: string) => {
-      bunShell.cwd(newCwd)
+      settings.cwd = newCwd ?? shellConfig.cwd
       return shell
     },
     env: (newEnv?: ShellEnv) => {
-      shellEnv = newEnv
+      settings.env = newEnv === undefined ? shellConfig.env : { ...settings.env, ...newEnv }
+      return shell
+    },
+    quiet: (isQuiet = true) => {
+      settings.quiet = isQuiet
       return shell
     },
     nothrow: () => {
-      bunShell.nothrow()
+      settings.throws = false
       return shell
     },
     throws: (shouldThrow: boolean) => {
-      bunShell.throws(shouldThrow)
+      settings.throws = shouldThrow
       return shell
     },
-    echo: (newShouldEcho: boolean) => {
-      shouldEcho = newShouldEcho
+    echo: (shouldEcho: boolean) => {
+      settings.echo = shouldEcho
       return shell
     },
-    bun: (newShouldUseBun: boolean) => {
-      shouldUseBun = newShouldUseBun
+    bun: (shouldUseBun: boolean) => {
+      settings.bun = shouldUseBun
       return shell
     },
   })

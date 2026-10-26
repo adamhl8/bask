@@ -22,6 +22,16 @@ describe("bask.ts validation", () => {
       "task 'build' can't use 'default' as an alias. Export it as the default instead.",
     ],
     [
+      "a 'default' alias on a task that's only the default export",
+      "bask-file/default-alias-default.ts",
+      "task 'default' can't use 'default' as an alias. Export it as the default instead.",
+    ],
+    [
+      "a 'default' alias on a named task that's also the default export",
+      "bask-file/named-default-alias-default.ts",
+      "task 'build' can't use 'default' as an alias. Export it as the default instead.",
+    ],
+    [
       "an alias that's another task's name",
       "bask-file/alias-taken-by-name.ts",
       "task 'update' has alias 'bump-deps', which task 'bumpDeps' already uses",
@@ -30,6 +40,11 @@ describe("bask.ts validation", () => {
       "an alias that's another task's alias",
       "bask-file/alias-taken-by-alias.ts",
       "task 'upgrade' has alias 'updateDeps', which task 'bumpDeps' already uses",
+    ],
+    [
+      "a baskConfig not made with defineConfig",
+      "bask-file/config-not-defined.ts",
+      "baskConfig isn't a config. Wrap it in defineConfig().",
     ],
   ])("fails on %s", async (_, baskFile, message) => {
     const { run } = await createProject({ baskFile })

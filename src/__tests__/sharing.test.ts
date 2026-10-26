@@ -36,4 +36,22 @@ describe("sharing tasks", () => {
 
     expect(all).toBe("Available tasks:\n    build\n    lint")
   })
+
+  it("applies a baskConfig re-exported with export *", async () => {
+    const { run } = await createProject({ baskFile: "sharing/config" })
+
+    const { stdout, stderr } = await run`bask hello`
+
+    expect(stdout).toBe("hi")
+    expect(stderr).toBe("")
+  })
+
+  it("replaces a re-exported baskConfig with a local one", async () => {
+    const { run } = await createProject({ baskFile: "sharing/config-override" })
+
+    const { stdout, stderr } = await run`bask hello`
+
+    expect(stdout).toBe("hi")
+    expect(stderr).toBe("echo hi")
+  })
 })
