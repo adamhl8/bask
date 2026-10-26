@@ -8,4 +8,7 @@ on:
 jobs:
   update-deps:
     uses: adamhl8/configs/.github/workflows/update-deps.yml@main
+    with:
+      # build and link bask's own bin because the shared install skips `prepare`
+      before-bump-deps: bun tsdown && bun install --ignore-scripts --no-summary
     secrets: inherit
