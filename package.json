@@ -51,11 +51,11 @@
     "prepare": "tsdown && bun install --ignore-scripts --no-summary && bask prepare"
   },
   "dependencies": {
-    "ts-explicit-errors": "^5.0.0"
+    "ts-explicit-errors": "^5.0.1"
   },
   "devDependencies": {
     "@adamhl8/bask": "file:.",
-    "@adamhl8/configs": "^3.4.0",
+    "@adamhl8/configs": "^3.4.1",
     "@arethetypeswrong/core": "^0.18.5",
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
@@ -71,7 +71,7 @@
     "oxlint-tsgolint": "^7.0.2005",
     "publint": "^0.3.25",
     "release-it": "^21.1.1",
-    "release-it-git-cliff": "^0.2.0",
+    "release-it-git-cliff": "^0.2.1",
     "tsdown": "^0.23.2",
     "typescript": "7.1.0-beta"
   },
