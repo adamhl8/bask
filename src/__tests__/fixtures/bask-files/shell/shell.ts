@@ -125,3 +125,38 @@ export const bunEnv = task(async ({ sh }) => {
 export const bunOff = task(async ({ sh }) => {
   await sh`runtime`.bun(false).echo(false)
 })
+
+export const arrayBuffer = task(async ({ sh }) => {
+  const output = await sh`echo hidden`.arrayBuffer()
+  console.log(`got ${new TextDecoder().decode(output).trim()}`)
+})
+
+export const blob = task(async ({ sh }) => {
+  const output = await sh`echo hidden`.blob()
+  console.log(`got ${(await output.text()).trim()}`)
+})
+
+export const awaitTwice = task(async ({ sh }) => {
+  const command = sh`echo once`
+  await command
+  await command
+})
+
+export const noPath = task(async ({ sh }) => {
+  sh.echo(false).env({ PATH: undefined })
+  await sh`echo path=$PATH`
+  await sh`echo path=$PATH`.bun(false)
+})
+
+export const nodePath = task(async ({ sh }) => {
+  await sh`which node`.echo(false)
+})
+
+export const color = task(async ({ sh }) => {
+  sh.echo(false)
+  await sh`echo color=$FORCE_COLOR`
+  const quietColor = await sh`echo $FORCE_COLOR`.text()
+  console.log(`quiet=${quietColor.trim()}`)
+  await sh`echo no-color=$FORCE_COLOR`.env({ NO_COLOR: "1" })
+  await sh`echo forced=$FORCE_COLOR`.env({ FORCE_COLOR: "0" })
+})

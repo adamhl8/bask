@@ -1,7 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 
-import { copyFixture, minimalEnv, packPackage } from "@adamhl8/configs/test"
+import { copyFixture, minimalEnv, packPackage, subprocessCoverageEnv } from "@adamhl8/configs/test"
 
 const ROOT = path.resolve(import.meta.dir, "../..")
 const FIXTURE = path.resolve(import.meta.dir, "fixtures/project")
@@ -20,7 +20,7 @@ interface ProjectOptions {
 
 /** Copies the fixture into a temp dir, installs the packed bask, and returns the dir and a shell bound to it. */
 export const createProject = async ({ baskFile }: ProjectOptions = {}) => {
-  const { dir, run } = await copyFixture(FIXTURE, { shell: { env: minimalEnv() } })
+  const { dir, run } = await copyFixture(FIXTURE, { shell: { env: minimalEnv(subprocessCoverageEnv()) } })
   if (baskFile !== undefined) {
     const source = path.join(BASK_FILES, baskFile)
     const isFolder = (await fs.stat(source)).isDirectory()

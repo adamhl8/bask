@@ -1,5 +1,3 @@
-import { err } from "ts-explicit-errors"
-
 import { getLoadedBaskFile } from "#bask-file/loaded.ts"
 import type { ShellConfig } from "#config.ts"
 import { createShell } from "#shell/shell.ts"
@@ -89,19 +87,9 @@ export function task(optionsOrFn: TaskOptions | TaskFn, maybeFn?: TaskFn): Task 
     }
   }
 
-  // Reject a task called at the top level of `bask.ts`, because the CLI hasn't finished loading it yet.
-  // Throw synchronously so the import of `bask.ts` fails, even without `await`.
   // oxlint-disable-next-line typescript/promise-function-async - an async function would turn the throw into a rejection
   const run = () => {
     const baskFile = getLoadedBaskFile()
-    if (!baskFile) {
-      throw err(
-        "a task ran while bask.ts was loading. Call tasks from inside other tasks, not at the top level.",
-        undefined,
-        { invalidBaskFile: true },
-      )
-    }
-
     return runOnce(baskFile.config.shell)
   }
 

@@ -33,17 +33,14 @@ const joinBaskFileErrors = (baskFileErrors: Error[]) => {
   return err([`bask.ts has ${baskFileErrors.length} problems:`, ...lines].join("\n"), undefined)
 }
 
-const isBaskFileExports = (value: unknown): value is BaskFileExports => typeof value === "object" && value !== null
-
 /** Imports `bask.ts`, and returns an error that marks it invalid instead of throwing it. */
 const importBaskFile = async (baskPath: string): Promise<Result<BaskFileExports>> => {
-  const baskFileExports: unknown = await attempt(async (): Promise<unknown> => import(baskPath))
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion - a module namespace is always an object, and `resolveBaskFileExports` checks each export
+  const baskFileExports = await attempt(async () => import(baskPath) as Promise<BaskFileExports>)
   if (isErr(baskFileExports) && getContext(baskFileExports, "invalidBaskFile")) return baskFileExports
 
   // Rethrow any other error, because a bug in `bask.ts` needs its stack trace.
   if (isErr(baskFileExports)) throw baskFileExports
-
-  if (!isBaskFileExports(baskFileExports)) return err("failed to import bask.ts", undefined)
 
   return baskFileExports
 }

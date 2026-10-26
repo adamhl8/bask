@@ -3,6 +3,7 @@ import { beforeAll } from "bun:test"
 import { packBask } from "#__tests__/utils.ts"
 
 import "@adamhl8/configs/test/preload"
+import "@adamhl8/configs/test/subprocess-coverage"
 
 beforeAll(async () => {
   void console.write("Building bask...")

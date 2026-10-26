@@ -9,6 +9,8 @@ export const levels = task(async ({ sh }) => {
   sh.quiet(false)
   await sh`echo shown by sh`
   await sh`echo hidden by command`.quiet()
+  sh.quiet()
+  await sh`echo hidden by sh`
 })
 
 export const failure = task(async ({ sh }) => {
@@ -28,4 +30,12 @@ export const caught = task(async ({ sh }) => {
   await sh`sh -c ${failingScript}`.catch(() => {
     console.log("caught")
   })
+})
+
+export const linesFailure = task(async ({ sh }) => {
+  for await (const line of sh`sh -c ${failingScript}`.lines()) console.log(line)
+})
+
+export const missingCwd = task(async ({ sh }) => {
+  await sh`echo hidden`.cwd("missing")
 })

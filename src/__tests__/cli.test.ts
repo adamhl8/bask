@@ -2,6 +2,8 @@ import { describe, expect, it, setDefaultTimeout } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 
+import { makeTempDir } from "@adamhl8/configs/test"
+
 import { createProject } from "#__tests__/utils.ts"
 
 setDefaultTimeout(30_000)
@@ -78,6 +80,28 @@ describe("running tasks", () => {
 
     expect(list).toBe("Available tasks:\n    default\n    lint")
     expect(output).toBe("ran deploy")
+  })
+
+  it("runs the project's own bask when started from another install", async () => {
+    const { dir } = await createProject()
+    const { dir: otherDir, run } = await createProject()
+
+    // Tasks only pass `isTask` in the copy of bask that made them, so this fails unless bask hands off.
+    const { stdout } = await run`${path.join(otherDir, "node_modules/.bin/bask")} build`.cwd(dir)
+
+    expect(stdout).toBe("ran build")
+  })
+
+  it("runs itself when the project doesn't install bask", async () => {
+    const { dir, run } = await createProject()
+    const emptyDir = await makeTempDir("bask-empty-")
+    // Add `node_modules` because Bun auto-installs packages for a folder without one, which would resolve a bask.
+    await fs.mkdir(path.join(emptyDir, "node_modules"))
+
+    const { stderr, exitCode } = await run`${path.join(dir, "node_modules/.bin/bask")}`.cwd(emptyDir).nothrow()
+
+    expect(exitCode).toBe(1)
+    expect(stderr).toBe(`error: no bask.ts in ${await fs.realpath(emptyDir)}`)
   })
 
   it.each(["cli/no-tasks.ts", "cli/hidden-only.ts"])(

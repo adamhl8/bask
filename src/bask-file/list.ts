@@ -29,8 +29,6 @@ export const formatTaskList = (tasks: TaskIndex) => {
 }
 
 export const list = task(() => {
-  // Throw because a task only runs after loading, so a missing file is a bug in bask.
-  const baskFile = getLoadedBaskFile()
-  if (!baskFile) throw new Error("list ran before bask.ts was loaded")
-  console.log(formatTaskList(baskFile.tasks))
+  const { tasks } = getLoadedBaskFile()
+  console.log(formatTaskList(tasks))
 })

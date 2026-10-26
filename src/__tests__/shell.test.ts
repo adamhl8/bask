@@ -2,11 +2,34 @@ import { describe, expect, it, setDefaultTimeout } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 
+import { minimalEnv, subprocessCoverageEnv } from "@adamhl8/configs/test"
 import bun from "bun"
 
 import { createProject } from "#__tests__/utils.ts"
 
 setDefaultTimeout(30_000)
+
+/** Runs bask in `dir` with stdout and stderr on one terminal, and returns everything it wrote there. */
+const runInTerminal = async (dir: string, ...args: string[]) => {
+  const decoder = new TextDecoder()
+  let output = ""
+  const closed = Promise.withResolvers<undefined>()
+  const subprocess = bun.spawn([path.join(dir, "node_modules/.bin/bask"), ...args], {
+    cwd: dir,
+    env: minimalEnv(subprocessCoverageEnv()),
+    terminal: {
+      data: (_terminal, data) => {
+        output += decoder.decode(data, { stream: true })
+      },
+      exit: () => {
+        closed.resolve(undefined)
+      },
+    },
+  })
+  // Wait for the terminal to close as well, because its last output can arrive after the process exits.
+  await Promise.all([subprocess.exited, closed.promise])
+  return output
+}
 
 const writeBin = async (dir: string, name: string, script: string) => {
   const binPath = path.join(dir, "node_modules/.bin", name)
@@ -97,6 +120,18 @@ describe("printing commands", () => {
     expect(stderr).toBe(String.raw`echo "{\"name\":\"bask\"}"`)
   })
 
+  it.each([
+    ["arrayBuffer()", "array-buffer"],
+    ["blob()", "blob"],
+  ])("prints the command but not its output with %s", async (_, taskName) => {
+    const { run } = await createProject({ baskFile: "shell/shell.ts" })
+
+    const { stdout, stderr } = await run`bask ${taskName}`
+
+    expect(stdout).toBe("got hidden")
+    expect(stderr).toBe("echo hidden")
+  })
+
   it("prints the command but not its output with lines()", async () => {
     const { run } = await createProject({ baskFile: "shell/shell.ts" })
 
@@ -113,6 +148,15 @@ describe("printing commands", () => {
 
     expect(stdout).toBe("done")
     expect(stderr).toBe("echo hidden")
+  })
+
+  it("prints a command once when it's awaited twice", async () => {
+    const { run } = await createProject({ baskFile: "shell/shell.ts" })
+
+    const { stdout, stderr } = await run`bask await-twice`
+
+    expect(stdout).toBe("once")
+    expect(stderr).toBe("echo once")
   })
 
   it("prints interpolated values the way the shell escapes them", async () => {
@@ -179,7 +223,7 @@ describe("quiet", () => {
     expect(stdout).toBe("shown by sh")
   })
 
-  it.each(["failure", "text-failure"])(
+  it.each(["failure", "text-failure", "lines-failure"])(
     "prints the hidden output of a failed command when its error reaches the CLI: %s",
     async (taskName) => {
       const { run } = await createProject({ baskFile: "shell/quiet" })
@@ -207,6 +251,26 @@ describe("quiet", () => {
     const { stdout } = await run`bask caught`
 
     expect(stdout).toBe("caught")
+  })
+
+  it("rethrows an error that isn't a failed command without printing hidden output", async () => {
+    const { run } = await createProject({ baskFile: "shell/quiet" })
+
+    const { stdout, stderr, exitCode } = await run`bask missing-cwd`.nothrow()
+
+    expect(exitCode).toBe(1)
+    expect(stdout).toBe("")
+    expect(stderr).toContain("No such file or directory")
+  })
+})
+
+describe("color", () => {
+  it("forces color for a command that writes to the terminal, unless it's quiet or the env sets color", async () => {
+    const { dir } = await createProject({ baskFile: "shell/shell.ts" })
+
+    const output = await runInTerminal(dir, "color")
+
+    expect(output).toBe("color=1\r\nquiet=\r\nno-color=\r\nforced=0\r\n")
   })
 })
 
@@ -252,6 +316,24 @@ describe("node", () => {
     const { stdout } = await run`bunx --bun bask bun-off`
 
     expect(stdout).toBe("node")
+  })
+
+  it("leaves PATH unset when env() removes it, with bun on or off", async () => {
+    const { run } = await createProject({ baskFile: "shell/shell.ts" })
+
+    const { stdout } = await run`bask no-path`
+
+    expect(stdout).toBe("path=\npath=")
+  })
+
+  it("removes its node shim folder when it exits", async () => {
+    const { run } = await createProject({ baskFile: "shell/shell.ts" })
+
+    const { stdout: nodePath } = await run`bask node-path`
+    const shimDir = path.dirname(nodePath)
+
+    expect(path.basename(shimDir)).toStartWith("bask-node-")
+    expect(await fs.exists(shimDir)).toBe(false)
   })
 })
 
