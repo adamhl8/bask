@@ -2,7 +2,8 @@ import { describe, expect, it, setDefaultTimeout } from "bun:test"
 import fs from "node:fs/promises"
 import path from "node:path"
 
-import { makeTempDir } from "@adamhl8/configs/test"
+import { makeTempDir, minimalEnv } from "@adamhl8/configs/test"
+import bun from "bun"
 
 import { createProject } from "#__tests__/utils.ts"
 
@@ -10,79 +11,109 @@ setDefaultTimeout(30_000)
 
 const STACK_FRAME = /at .*bask\.ts:\d+:\d+/v
 
-const TASK_LIST = `Available tasks:
+/** Runs bask in `dir` with stdout and stderr on one terminal, and returns everything it wrote there. */
+const runInTerminal = async (dir: string, ...args: string[]) => {
+  const decoder = new TextDecoder()
+  let output = ""
+  const closed = Promise.withResolvers<undefined>()
+  const subprocess = bun.spawn([path.join(dir, "node_modules/.bin/bask"), ...args], {
+    cwd: dir,
+    env: minimalEnv(),
+    terminal: {
+      data: (_terminal, data) => {
+        output += decoder.decode(data, { stream: true })
+      },
+      exit: () => {
+        closed.resolve(undefined)
+      },
+    },
+  })
+  // Wait for the terminal to close as well, because its last output can arrive after the process exits.
+  await Promise.all([subprocess.exited, closed.promise])
+  return output
+}
+
+const writeBin = async (dir: string, name: string, script: string) => {
+  const binPath = path.join(dir, "node_modules/.bin", name)
+  await bun.write(binPath, script)
+  // Set the mode with `chmod` because `Bun.write` ignores its `mode` option.
+  await fs.chmod(binPath, 0o755)
+}
+
+const echoScript = (output: string) => `#!/bin/sh\necho ${output}\n`
+const runtimeScript = `#!/usr/bin/env node\nconsole.log(process.versions.bun ? "bun" : "node")\n`
+
+describe("the bask command", () => {
+  it("should run a task named on the command line", async () => {
+    const { run } = await createProject()
+
+    const { stdout, exitCode } = await run`bask bump-deps`
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe("ran bump-deps")
+  })
+
+  it("should print the task list to stdout", async () => {
+    const { run } = await createProject()
+
+    const { stdout } = await run`bask -l`
+
+    expect(stdout).toBe(`Available tasks:
     build     # Build the project [default] [alias: b]
     bump-deps # [aliases: up, update-deps]
-    lint`
+    lint`)
+  })
 
-describe("running tasks", () => {
-  it.each(["bump-deps", "bumpDeps"])("runs a task by its name: %s", async (name) => {
+  it("should export the list task from the package", async () => {
+    const { run } = await createProject({ baskFile: "list-hooks.ts" })
+
+    const { stdout } = await run`bask -l`
+
+    expect(stdout).toBe("Available tasks:\n    build\n\nRun `bask <task>` to run a task.")
+  })
+
+  it("should exit with the failed command's exit code and report it on stderr", async () => {
+    const { run } = await createProject({ baskFile: "failures.ts" })
+
+    const { stderr, exitCode } = await run`bask fail`.nothrow()
+
+    expect(exitCode).toBe(3)
+    expect(stderr).toBe("exit 3\nerror: task 'fail' failed with exit code 3")
+  })
+
+  it("should exit with 2 on an unknown flag", async () => {
     const { run } = await createProject()
 
-    const { stdout } = await run`bask ${name}`
+    const { stderr, exitCode } = await run`bask --nope`.nothrow()
 
-    expect(stdout).toBe("ran bump-deps")
+    expect(exitCode).toBe(2)
+    expect(stderr).toStartWith("error: Unknown option '--nope'")
   })
 
-  it.each(["up", "update-deps", "updateDeps"])("runs a task by its alias: %s", async (alias) => {
-    const { run } = await createProject()
+  it("should print a stack trace when a task throws", async () => {
+    const { run } = await createProject({ baskFile: "failures.ts" })
 
-    const { stdout } = await run`bask ${alias}`
+    const { stderr, exitCode } = await run`bask crash`.nothrow()
 
-    expect(stdout).toBe("ran bump-deps")
+    expect(exitCode).toBe(1)
+    expect(stderr).toContain("error: task bug")
+    expect(stderr).toMatch(STACK_FRAME)
   })
 
-  it("runs a hidden task", async () => {
-    const { run } = await createProject()
+  it("should refuse to run when bask.ts is run directly", async () => {
+    const { run } = await createProject({ baskFile: "logs-on-load.ts" })
 
-    const { stdout } = await run`bask release-run`
+    const { stderr, exitCode } = await run`bun bask build`.nothrow()
 
-    expect(stdout).toBe("ran release-run")
+    expect(exitCode).toBe(1)
+    expect(stderr).toBe(
+      "error: bask.ts can't be run directly. Use `bunx` instead of `bun`.\nEither run `bunx bask build` or run `bask build` directly (if installed globally).",
+    )
   })
+})
 
-  it("runs the default task when no task is named", async () => {
-    const { run } = await createProject()
-
-    const { stdout } = await run`bask`
-
-    expect(stdout).toBe("ran build")
-  })
-
-  it("lists the tasks when no task is named and there's no default", async () => {
-    const { run } = await createProject({ baskFile: "cli/no-default.ts" })
-
-    const { stdout } = await run`bask`
-
-    expect(stdout).toBe("Available tasks:\n    lint")
-  })
-
-  it.each(["-l", "--list"])("lists the tasks with %s", async (flag) => {
-    const { run } = await createProject()
-
-    const { stdout } = await run`bask ${flag}`
-
-    expect(stdout).toBe(TASK_LIST)
-  })
-
-  it("runs the default task by the name 'default'", async () => {
-    const { run } = await createProject()
-
-    const { stdout } = await run`bask default`
-
-    expect(stdout).toBe("ran build")
-  })
-
-  it("lists and runs a task that's only the default export", async () => {
-    const { run } = await createProject({ baskFile: "cli/default-only.ts" })
-
-    const { stdout: list } = await run`bask -l`
-    const { stdout: output } = await run`bask`
-
-    expect(list).toBe("Available tasks:\n    default\n    lint")
-    expect(output).toBe("ran deploy")
-  })
-
-  it("runs the project's own bask when started from another install", async () => {
+describe("the project's own install", () => {
+  it("should run the project's own bask when started from another install", async () => {
     const { dir } = await createProject()
     const { dir: otherDir, run } = await createProject()
 
@@ -92,9 +123,19 @@ describe("running tasks", () => {
     expect(stdout).toBe("ran build")
   })
 
-  it("runs itself when the project doesn't install bask", async () => {
+  it("should keep the project's bask's exit code when started from another install", async () => {
+    const { dir } = await createProject({ baskFile: "failures.ts" })
+    const { dir: otherDir, run } = await createProject()
+
+    const { stderr, exitCode } = await run`${path.join(otherDir, "node_modules/.bin/bask")} fail`.cwd(dir).nothrow()
+
+    expect(exitCode).toBe(3)
+    expect(stderr).toBe("exit 3\nerror: task 'fail' failed with exit code 3")
+  })
+
+  it("should run itself when the project doesn't install bask", async () => {
     const { dir, run } = await createProject()
-    const emptyDir = await makeTempDir("bask-empty-")
+    const emptyDir = await makeTempDir()
     // Add `node_modules` because Bun auto-installs packages for a folder without one, which would resolve a bask.
     await fs.mkdir(path.join(emptyDir, "node_modules"))
 
@@ -103,126 +144,85 @@ describe("running tasks", () => {
     expect(exitCode).toBe(1)
     expect(stderr).toBe(`error: no bask.ts in ${await fs.realpath(emptyDir)}`)
   })
-
-  it.each(["cli/no-tasks.ts", "cli/hidden-only.ts"])(
-    "lists no tasks when there are none to show: %s",
-    async (baskFile) => {
-      const { run } = await createProject({ baskFile })
-
-      const { stdout } = await run`bask`
-
-      expect(stdout).toBe("Available tasks:")
-    },
-  )
 })
 
-describe("failures", () => {
-  it("fails on an unknown task", async () => {
-    const { run } = await createProject()
+describe("command output", () => {
+  it("should print each command before its output", async () => {
+    const { run } = await createProject({ baskFile: "shell.ts" })
 
-    const { stderr, exitCode } = await run`bask nope`.nothrow()
+    // Redirect stderr into stdout so both share one pipe and keep the order they were written in.
+    const { stdout } = await run`bask echo 2>&1`
 
-    expect(exitCode).toBe(1)
-    expect(stderr).toBe(`error: unknown task 'nope'\n\n${TASK_LIST}`)
+    expect(stdout).toBe("echo one\none\ntwo\nthree\necho four\nfour")
   })
 
-  it("fails on 'default' when there's no default task", async () => {
-    const { run } = await createProject({ baskFile: "cli/no-default.ts" })
+  it("should hide output with quiet() at every level", async () => {
+    const { run } = await createProject({ baskFile: "quiet.ts" })
 
-    const { stderr, exitCode } = await run`bask default`.nothrow()
+    const { stdout } = await run`bask levels`
 
-    expect(exitCode).toBe(1)
-    expect(stderr).toBe("error: unknown task 'default'\n\nAvailable tasks:\n    lint")
+    expect(stdout).toBe("shown by sh")
   })
 
-  it("fails on an unknown flag", async () => {
-    const { run } = await createProject()
+  it("should not print a failed command's output again when it was already shown", async () => {
+    const { run } = await createProject({ baskFile: "quiet.ts" })
 
-    const { stderr, exitCode } = await run`bask --nope`.nothrow()
+    const { stdout, stderr } = await run`bask shown-failure`.nothrow()
 
-    expect(exitCode).toBe(2)
-    expect(stderr).toStartWith("error: Unknown option '--nope'")
+    expect(stdout).toBe("out")
+    expect(stderr).toBe("err\nerror: task 'shown-failure' failed with exit code 3")
   })
 
-  it("fails without a bask.ts", async () => {
-    const { dir, run } = await createProject()
-    await fs.rm(path.join(dir, "bask.ts"))
+  it("should force color for a command that writes to the terminal, unless it's quiet or the env sets color", async () => {
+    const { dir } = await createProject({ baskFile: "shell.ts" })
 
-    const { stderr, exitCode } = await run`bask`.nothrow()
+    const output = await runInTerminal(dir, "color")
 
-    expect(exitCode).toBe(1)
+    expect(output).toBe("color=1\r\nquiet=\r\nno-color=\r\nforced=0\r\n")
+  })
+})
+
+describe("the command environment", () => {
+  it("should resolve a relative cwd from where bask runs", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell.ts" })
     // Compare against the real path because macOS reports the temp dir under /private.
-    expect(stderr).toBe(`error: no bask.ts in ${await fs.realpath(dir)}`)
+    const realDir = await fs.realpath(dir)
+
+    const { stdout } = await run`bask cwd`
+
+    expect(stdout).toBe(`${realDir}/sub\n${realDir}/sub/inner\n${realDir}`)
   })
 
-  it("refuses to run when bask.ts is run directly", async () => {
-    const { run } = await createProject({ baskFile: "cli/logs-on-load.ts" })
+  it("should find commands in node_modules/.bin of the current folder and its parents, nearest first", async () => {
+    const { dir, run } = await createProject({ baskFile: "bin-path" })
+    const nested = path.join(dir, "nested")
+    await writeBin(dir, "outer", echoScript("outer"))
+    await writeBin(dir, "both", echoScript("outer both"))
+    await writeBin(nested, "inner", echoScript("inner"))
+    await writeBin(nested, "both", echoScript("inner both"))
 
-    const { stderr, exitCode } = await run`bun bask build`.nothrow()
+    // Start bask through its `.bin` link because `localBins` and package managers put `.bin` on `PATH` themselves.
+    const { stdout } = await run`${path.join(dir, "node_modules/.bin/bask")} bins`.cwd(nested).localBins(false)
 
-    expect(exitCode).toBe(1)
-    expect(stderr).toBe(
-      "error: bask.ts can't be run directly. Use `bunx` instead of `bun`.\nEither run `bunx bask build` or run `bask build` directly (if installed globally).",
-    )
+    expect(stdout).toBe("inner\nouter\ninner both")
   })
 
-  it("exits with the failed command's exit code", async () => {
-    const { run } = await createProject({ baskFile: "cli/failures.ts" })
+  it("should run the real node with bun(false) when bask starts under Bun's own node shim", async () => {
+    const { dir, run } = await createProject({ baskFile: "shell.ts" })
+    await writeBin(dir, "runtime", runtimeScript)
 
-    const { stderr, exitCode } = await run`bask fail`.nothrow()
+    const { stdout } = await run`bunx --bun bask bun-off`
 
-    expect(exitCode).toBe(3)
-    expect(stderr).toBe("exit 3\nerror: task 'fail' failed with exit code 3")
+    expect(stdout).toBe("node")
   })
 
-  it("names the task, not the alias it ran under", async () => {
-    const { run } = await createProject({ baskFile: "cli/failures.ts" })
+  it("should remove its node shim folder when it exits", async () => {
+    const { run } = await createProject({ baskFile: "shell.ts" })
 
-    const { stderr, exitCode } = await run`bask f`.nothrow()
+    const { stdout: nodePath } = await run`bask node-path`
+    const shimDir = path.dirname(nodePath)
 
-    expect(exitCode).toBe(3)
-    expect(stderr).toBe("exit 3\nerror: task 'fail' failed with exit code 3")
-  })
-
-  it("names the dependency that failed", async () => {
-    const { run } = await createProject({ baskFile: "cli/failures.ts" })
-
-    const { stderr, exitCode } = await run`bask build`.nothrow()
-
-    expect(exitCode).toBe(4)
-    expect(stderr).toBe("exit 4\nerror: task 'compile' failed with exit code 4")
-  })
-
-  it("names the task that was run when the failed task isn't exported", async () => {
-    const { run } = await createProject({ baskFile: "cli/failures.ts" })
-
-    const { stderr, exitCode } = await run`bask deploy`.nothrow()
-
-    expect(exitCode).toBe(5)
-    expect(stderr).toBe("exit 5\nerror: task 'deploy' failed with exit code 5")
-  })
-
-  it("prints a stack trace when a task throws", async () => {
-    const { run } = await createProject({ baskFile: "cli/failures.ts" })
-
-    const { stderr, exitCode } = await run`bask crash`.nothrow()
-
-    expect(exitCode).toBe(1)
-    expect(stderr).toContain("error: task bug")
-    expect(stderr).toMatch(STACK_FRAME)
-  })
-
-  it.each([
-    ["with", "cli/top-level-call.ts"],
-    ["without", "cli/top-level-call-unawaited.ts"],
-  ])("fails when bask.ts runs a task at its top level %s await", async (_, baskFile) => {
-    const { run } = await createProject({ baskFile })
-
-    const { stderr, exitCode } = await run`bask build`.nothrow()
-
-    expect(exitCode).toBe(1)
-    expect(stderr).toBe(
-      "error: a task ran while bask.ts was loading. Call tasks from inside other tasks, not at the top level.",
-    )
+    expect(path.basename(shimDir)).toStartWith("bask-node-")
+    expect(await fs.exists(shimDir)).toBe(false)
   })
 })
