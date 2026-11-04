@@ -1,3 +1,15 @@
+## [0.6.1](https://github.com/adamhl8/bask/compare/v0.6.0..v0.6.1) - 2026-11-04
+
+### 🚜 Refactor
+
+- clean up tests ([f94e8f3](https://github.com/adamhl8/bask/commit/f94e8f338a69f9965840232940348fdb8e25f666) by @adamhl8)
+
+### ⚙️ Miscellaneous Tasks
+
+- build bask before bump-deps ([b80c99f](https://github.com/adamhl8/bask/commit/b80c99fffbdd8a19dbfc337bcd3292c6954890e2) by @adamhl8)
+
+- _(deps)_ update dependencies ([0031a5c](https://github.com/adamhl8/bask/commit/0031a5c118307eed9a737748b15a17233f30370f) by @adamhl8)
+
 ## [0.6.0](https://github.com/adamhl8/bask/compare/v0.5.0..v0.6.0) - 2026-10-26
 
 ### 🚀 Features
