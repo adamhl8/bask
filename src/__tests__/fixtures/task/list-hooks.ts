@@ -1,4 +1,4 @@
-import { list } from "#bask-file/list.ts"
+import { list } from "#cli/list.ts"
 import { task } from "#task.ts"
 
 export const build = task(() => {

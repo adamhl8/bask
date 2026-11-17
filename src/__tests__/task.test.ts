@@ -74,6 +74,28 @@ describe("hooks", () => {
   })
 })
 
+describe("args", () => {
+  const ARGS = path.join(FIXTURES, "args.ts")
+
+  it("should give the named task its args, and its hooks too", async () => {
+    const { stdout } = await runInProcess(ARGS, "test", "-w", "--timeout", "9", "a.ts")
+
+    expect(stdout).toBe("before test watch=true positionals=a.ts\nran test watch=true timeout=9 positionals=a.ts")
+  })
+
+  it("should give a task run as a dependency empty args", async () => {
+    const { stdout } = await runInProcess(ARGS, "ci")
+
+    expect(stdout).toBe("before test watch=false positionals=\nran test watch=false timeout=undefined positionals=")
+  })
+
+  it("should give a task used as a hook empty args", async () => {
+    const { stdout } = await runInProcess(ARGS, "deploy", "--env", "prod")
+
+    expect(stdout).toBe("ran clean all=false\nran deploy env=prod")
+  })
+})
+
 describe("task()", () => {
   it("should throw without a callback", async () => {
     const { thrownMessage } = await runInProcess(path.join(FIXTURES, "missing-callback.ts"), "build")

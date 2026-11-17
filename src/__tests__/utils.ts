@@ -5,10 +5,10 @@ import { copyFixture, minimalEnv, packPackage } from "@adamhl8/configs/test"
 import bun from "bun"
 import { attempt, getContext, isErr, messageChain } from "ts-explicit-errors"
 
-import type { runBask } from "#run-bask.ts"
+import type { runBask } from "#cli/run-bask.ts"
 
 const ROOT = path.resolve(import.meta.dir, "../..")
-const RUN_BASK_MODULE = path.resolve(import.meta.dir, "../run-bask.ts")
+const RUN_BASK_MODULE = path.resolve(import.meta.dir, "../cli/run-bask.ts")
 const FIXTURE = path.resolve(import.meta.dir, "fixtures/project")
 const BASK_FILES = path.resolve(import.meta.dir, "fixtures/bask-files")
 const FINAL_NEWLINE = /\n$/v
@@ -97,7 +97,7 @@ export const runInProcess = async (baskPath: string, ...args: string[]) => {
     stdout: stdout.replace(FINAL_NEWLINE, ""),
     stderr: stderr.replace(FINAL_NEWLINE, ""),
     errorMessage: isErr(result) ? messageChain(result) : undefined,
-    exitCode: isErr(result) ? getContext<number>(result, "exitCode") : undefined,
+    exitCode: isErr(result) ? getContext<number>(result, "exitCode") : result,
     thrownMessage: isErr(run) ? run.message : undefined,
   }
 }

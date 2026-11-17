@@ -76,9 +76,10 @@ describe("bask.ts validation", () => {
     const baskPath = path.join(FIXTURES, "non-task-exports.ts")
 
     const { stdout: taskList } = await runInProcess(baskPath, "-l")
-    const { errorMessage } = await runInProcess(baskPath, "helper")
+    const { stderr, exitCode } = await runInProcess(baskPath, "helper")
 
     expect(taskList).toBe("Available tasks:\n    build")
-    expect(errorMessage).toStartWith("unknown task 'helper'")
+    expect(exitCode).toBe(2)
+    expect(stderr).toContain('Unknown task "helper"')
   })
 })

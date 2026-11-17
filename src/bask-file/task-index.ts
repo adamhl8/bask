@@ -3,8 +3,9 @@ import { err } from "ts-explicit-errors"
 import type { BaskFileExports } from "#bask-file/bask-file.ts"
 import { isTask } from "#task.ts"
 import type { Task } from "#task.ts"
+import { toCamelCase, toKebabCase } from "#utils.ts"
 
-interface TaskEntry {
+export interface TaskEntry {
   /** Export name as written in `bask.ts`, for error messages. */
   exportName: string
   /** Kebab-case export name, or `default` for a task that's only the default export. */
@@ -20,9 +21,6 @@ export interface TaskIndex {
   /** Each entry once, under its task, in export order. */
   byTask: Map<Task, TaskEntry>
 }
-
-const toKebabCase = (name: string) => name.replaceAll(/[A-Z]/gv, (match) => `-${match.toLowerCase()}`)
-const toCamelCase = (name: string) => name.replaceAll(/-[\da-z]/gv, (match) => match.slice(1).toUpperCase())
 
 /** Indexes the bask file's tasks under both spellings of their export names and aliases, collecting any errors. */
 export const indexTasks = (baskFileExports: BaskFileExports) => {

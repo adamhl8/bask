@@ -2,7 +2,7 @@ import path from "node:path"
 
 import bun from "bun"
 
-import { printError } from "#utils.ts"
+import { printError } from "#cli/print-error.ts"
 
 // Stop a `bun bask` run because Bun runs bask.ts itself instead of the bask CLI.
 if (path.basename(bun.main) === "bask.ts") {
@@ -15,6 +15,6 @@ if (path.basename(bun.main) === "bask.ts") {
 
 export { defineConfig } from "#config.ts"
 export type { BaskConfigInput } from "#config.ts"
-export { list } from "#bask-file/list.ts"
+export { list } from "#cli/list.ts"
 export { isTask, task } from "#task.ts"
 export type { Task } from "#task.ts"

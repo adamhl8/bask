@@ -13,6 +13,7 @@ A task runner where your tasks are TypeScript functions.
   - [Task options](#task-options)
   - [Task naming](#task-naming)
   - [The default task](#the-default-task)
+  - [Task arguments](#task-arguments)
   - [Task dependencies](#task-dependencies)
   - [Task hooks](#task-hooks)
 - [Running commands](#running-commands)
@@ -93,7 +94,7 @@ Available tasks:
 
 ### Defining tasks
 
-`task` takes a function, and optionally an [options](#task-options) object first. The function receives `sh`, a [shell](#running-commands) for running commands, and it can be async or sync:
+`task` takes a function, and optionally an [options](#task-options) object first. The function receives `sh`, a [shell](#running-commands) for running commands, along with the task's [`args` and `positionals`](#task-arguments). It can be async or sync:
 
 ```ts
 export const build = task({ desc: "Build the project" }, async ({ sh }) => {
@@ -113,6 +114,8 @@ export const hello = task(() => {
 - `hidden`: Keeps the task runnable but leaves it out of the task list
 - `alias`: Other names the task runs under, as a string or an array
   - Write them in kebab-case or camelCase, and either spelling runs the task
+- `args`: The args the task takes from the command line (see [Task arguments](#task-arguments))
+- `positionals`: Lets the task take positionals, including everything after `--` (see [Task arguments](#task-arguments))
 
 ```ts
 export const releaseRun = task({ desc: "Run from CI", hidden: true }, async ({ sh }) => {
@@ -167,6 +170,66 @@ export default build
 
 ---
 
+### Task arguments
+
+A task can take args from the command line. Declare them with the `args` option, and set `positionals: true` to accept positionals. The task gets them, typed, as `args` and `positionals`:
+
+```ts
+export const test = task(
+  {
+    desc: "Run tests",
+    args: {
+      watch: { short: "w", desc: "Rerun when files change" },
+      timeout: { type: "string", desc: "Per-test timeout in ms" },
+    },
+    positionals: true,
+  },
+  async ({ sh, args, positionals }) => {
+    // args: { watch: boolean, timeout: string | undefined }, positionals: string[]
+    await sh`bun test ${args.watch ? "--watch" : []} --timeout ${args.timeout ?? "5000"} ${positionals}`
+  },
+)
+```
+
+```sh
+bask test -w --timeout 10000 src/foo.test.ts
+bask test -- --bail # everything after `--` is a positional
+```
+
+Each arg takes:
+
+- `short`: A one-letter or one-digit short flag, like `w` for `-w`
+- `type`: `"boolean"` (the default) or `"string"`
+- `desc`: Shown on the task's help page
+
+The long flag is the arg's name in kebab-case, so `dryRun` is `--dry-run`. An arg that isn't passed is `false` if it's a boolean, or `undefined` if it's a string.
+
+- Flags before the task name are bask's, and args after it are the task's: `bask -l` lists the tasks, while `bask test -l` passes `-l` to `test`
+  - bask doesn't reserve any names, so a task can declare its own `-l` or `-h`
+- You must name a default task to pass args to it: `bask build -w` or `bask default -w`
+- An unknown flag, a missing value, or a positional to a task that doesn't accept them prints the task's usage and an error, and exits with code 2
+
+Only the command line passes args, and only to the task you named. A task that runs as a [dependency](#task-dependencies) or as a [hook](#task-hooks) gets its own empty args, so for a variant, make a separate task. A hook function on the named task gets that task's `args` and `positionals` (see [Task hooks](#task-hooks)).
+
+Run `bask -h <task>` to see a task's help page:
+
+```
+Run tests
+Usage: bask test [-w/--watch] [--timeout VALUE] [ARG...]
+
+  ARG
+  -w, --watch                 Rerun when files change
+  --timeout VALUE             Per-test timeout in ms
+```
+
+Args also show next to the task in the task list:
+
+```
+    test # Run tests [-w/--watch] [--timeout VALUE] [ARG...]
+```
+
+---
+
 ### Task dependencies
 
 To depend on another task, call it. Each task runs at most once per invocation, however many tasks call it. If two tasks call it at the same time, they both wait on the same run.
@@ -211,7 +274,18 @@ build.after(async ({ sh }) => {
 - Hooks run once per invocation, along with their task
   - This includes when another task calls the task
 - Each hook gets its own `sh`, separate from the task's
+- A hook function gets its task's `args` and `positionals`, typed from the task's `args` option
+- A task used as a hook runs with its own empty args, not the args of the task it's hooked to
 - Adding a hook to a task that has already started throws an error
+
+A hook function can check its task's args, which helps when extending a shared task:
+
+```ts
+// The shared `build` task declares a `watch` arg
+build.after(async ({ sh, args }) => {
+  if (!args.watch) await sh`du -sh dist`
+})
+```
 
 The built-in `list` task, which prints the task list, takes hooks too:
 
@@ -370,16 +444,18 @@ This way, each project extends the shared tasks without copying or replacing the
 
 ## CLI Reference
 
-`bask [options] [task]`
+`bask [-l] [-h] [task] [task args]`
 
 - `task`: The task to run, by its kebab-case name, camelCase name, or an alias (default: the default export)
+- `task args`: The [args and positionals](#task-arguments) to pass to the task
 - `-l`, `--list`: List the available tasks
+- `-h`, `--help`: Show bask's help and the task list, or a task's help with `bask -h <task>`
 
-If the task doesn't exist, bask prints an error followed by the task list.
+If the arguments are invalid, including an unknown task, bask prints the usage and an error.
 
 **Exit codes:**
 
 - `0`: The task succeeded
-- `1`: There's no `bask.ts`, it has a problem (e.g. a task exported twice), or the task doesn't exist
-- `2`: The arguments are invalid
+- `1`: There's no `bask.ts`, or it has a problem (e.g. a task exported twice)
+- `2`: The arguments are invalid, including an unknown task or the task's args
 - Otherwise, the exit code of the command that failed

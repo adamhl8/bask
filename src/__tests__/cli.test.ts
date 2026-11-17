@@ -12,13 +12,13 @@ setDefaultTimeout(30_000)
 const STACK_FRAME = /at .*bask\.ts:\d+:\d+/v
 
 /** Runs bask in `dir` with stdout and stderr on one terminal, and returns everything it wrote there. */
-const runInTerminal = async (dir: string, ...args: string[]) => {
+const runInTerminal = async (dir: string, args: string[], env: Record<string, string> = {}) => {
   const decoder = new TextDecoder()
   let output = ""
   const closed = Promise.withResolvers<undefined>()
   const subprocess = bun.spawn([path.join(dir, "node_modules/.bin/bask"), ...args], {
     cwd: dir,
-    env: minimalEnv(),
+    env: minimalEnv(env),
     terminal: {
       data: (_terminal, data) => {
         output += decoder.decode(data, { stream: true })
@@ -87,7 +87,26 @@ describe("the bask command", () => {
     const { stderr, exitCode } = await run`bask --nope`.nothrow()
 
     expect(exitCode).toBe(2)
-    expect(stderr).toStartWith("error: Unknown option '--nope'")
+    expect(stderr).toContain('Error: Unexpected option or argument: "--nope".')
+  })
+
+  it("should pass task args from the command line", async () => {
+    const { run } = await createProject({ baskFile: "args.ts" })
+
+    const { stdout, exitCode } = await run`bask test -w a.ts`
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe("ran test watch=true positionals=a.ts")
+  })
+
+  it("should exit with 2 on an unknown task flag", async () => {
+    const { run } = await createProject({ baskFile: "args.ts" })
+
+    const { stderr, exitCode } = await run`bask test --wach`.nothrow()
+
+    expect(exitCode).toBe(2)
+    expect(stderr).toStartWith("Usage: bask test")
+    expect(stderr).toContain('Error: Unexpected option or argument: "--wach".')
   })
 
   it("should print a stack trace when a task throws", async () => {
@@ -176,9 +195,22 @@ describe("command output", () => {
   it("should force color for a command that writes to the terminal, unless it's quiet or the env sets color", async () => {
     const { dir } = await createProject({ baskFile: "shell.ts" })
 
-    const output = await runInTerminal(dir, "color")
+    const output = await runInTerminal(dir, ["color"])
 
     expect(output).toBe("color=1\r\nquiet=\r\nno-color=\r\nforced=0\r\n")
+  })
+})
+
+describe("argument errors", () => {
+  it("should color Optique's errors in a terminal, unless NO_COLOR is set", async () => {
+    const { dir } = await createProject()
+
+    const colored = await runInTerminal(dir, ["--nope"], { TERM: "xterm-256color" })
+    const plain = await runInTerminal(dir, ["--nope"], { TERM: "xterm-256color", NO_COLOR: "1" })
+
+    expect(bun.stripANSI(colored)).not.toBe(colored)
+    expect(plain).toContain('Unexpected option or argument: "--nope"')
+    expect(bun.stripANSI(plain)).toBe(plain)
   })
 })
 

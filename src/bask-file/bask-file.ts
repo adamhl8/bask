@@ -4,11 +4,11 @@ import bun from "bun"
 import type { Result } from "ts-explicit-errors"
 import { attempt, err, getContext, isErr, messageChain } from "ts-explicit-errors"
 
-import { setLoadedBaskFile } from "#bask-file/loaded.ts"
 import { indexTasks } from "#bask-file/task-index.ts"
 import type { TaskIndex } from "#bask-file/task-index.ts"
 import { isBaskConfig, resolveShellConfig } from "#config.ts"
 import type { BaskConfig, BaskConfigInput } from "#config.ts"
+import { setLoadedBaskFile } from "#loaded-bask-file.ts"
 import { addBinDirsToPath } from "#shell/bin-dirs.ts"
 import { isTask } from "#task.ts"
 
@@ -26,7 +26,7 @@ export interface BaskFile {
 }
 
 /** Returns a single error as is, or joins several into one error under a count with one per line. */
-const joinBaskFileErrors = (baskFileErrors: Error[]) => {
+export const joinBaskFileErrors = (baskFileErrors: Error[]) => {
   const [onlyError] = baskFileErrors
   if (onlyError && baskFileErrors.length === 1) return onlyError
   const lines = baskFileErrors.map((error) => `  ${messageChain(error)}`)
