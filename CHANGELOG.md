@@ -1,3 +1,9 @@
+## [0.7.1](https://github.com/adamhl8/bask/compare/v0.7.0..v0.7.1) - 2026-11-17
+
+### 🐛 Bug Fixes
+
+- export NoArgs ([37358ee](https://github.com/adamhl8/bask/commit/37358ee8b8421273247917f15249c6b887f401aa) by @adamhl8)
+
 ## [0.7.0](https://github.com/adamhl8/bask/compare/v0.6.1..v0.7.0) - 2026-11-17
 
 ### 🚀 Features
