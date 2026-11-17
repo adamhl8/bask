@@ -10,6 +10,7 @@ import { createProject } from "#__tests__/utils.ts"
 setDefaultTimeout(30_000)
 
 const STACK_FRAME = /at .*bask\.ts:\d+:\d+/v
+const TSC_BIN = path.resolve(import.meta.dir, "../../node_modules/.bin/tsc")
 
 /** Runs bask in `dir` with stdout and stderr on one terminal, and returns everything it wrote there. */
 const runInTerminal = async (dir: string, args: string[], env: Record<string, string> = {}) => {
@@ -211,6 +212,19 @@ describe("argument errors", () => {
     expect(bun.stripANSI(colored)).not.toBe(colored)
     expect(plain).toContain('Unexpected option or argument: "--nope"')
     expect(bun.stripANSI(plain)).toBe(plain)
+  })
+})
+
+describe("the package's types", () => {
+  it("should let a bask.ts emit declarations for a task that takes no args", async () => {
+    const { run } = await createProject()
+
+    // Emit declarations because that's when TypeScript has to name the type of each exported task.
+    const { stdout, exitCode } =
+      await run`${TSC_BIN} --declaration --emitDeclarationOnly --outDir out --module nodenext --moduleResolution nodenext --target esnext --skipLibCheck bask.ts`.nothrow()
+
+    expect(stdout).toBe("")
+    expect(exitCode).toBe(0)
   })
 })
 

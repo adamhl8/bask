@@ -9,6 +9,13 @@
 - So a test fixture that needs a visible "absent" value in JSON can't use `null`. Write a marker string such as
   `"undefined"` instead.
 
+## Public types
+
+- Export from `src/index.ts` every type that can show up in the inferred type of a user's task, such as `NoArgs` in
+  `Task<NoArgs>`. Otherwise a `bask.ts` that emits declarations fails with TS2883 ("cannot be named without a
+  reference to ..."). The subprocess test "should let a bask.ts emit declarations for a task that takes no args"
+  checks this against the packed package.
+
 ## Optique
 
 bask parses command-line args with `@optique/core`, but the task API never exposes it.
