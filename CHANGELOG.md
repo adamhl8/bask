@@ -1,3 +1,9 @@
+## [0.7.0](https://github.com/adamhl8/bask/compare/v0.6.1..v0.7.0) - 2026-11-17
+
+### 🚀 Features
+
+- add task args ([07fb220](https://github.com/adamhl8/bask/commit/07fb220a6ba7c2b610a6ef508b24831267ab5b17) by @adamhl8)
+
 ## [0.6.1](https://github.com/adamhl8/bask/compare/v0.6.0..v0.6.1) - 2026-11-04
 
 ### 🚜 Refactor
