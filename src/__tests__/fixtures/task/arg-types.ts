@@ -28,3 +28,23 @@ typed.before(({ args }) => {
   const watch: boolean = args.watch
   console.log(watch)
 })
+
+const wrapped = typed.wrap({ args: { release: { short: "r" } } }, ({ args, original }) => {
+  const release: boolean = args.release
+  const watch: boolean = args.watch
+  const callOriginal: () => Promise<void> = original
+  console.log(release, watch, callOriginal)
+  // @ts-expect-error `nope` isn't a declared arg
+  console.log(args.nope)
+})
+
+wrapped.after(({ args }) => {
+  const release: boolean = args.release
+  console.log(release)
+})
+
+typed.wrap({}, ({ args }) => {
+  // Use brackets because `noPropertyAccessFromIndexSignature` rejects `args.nope` even on a loose type.
+  // @ts-expect-error `nope` isn't a declared arg, even when `wrap` adds none
+  console.log(args["nope"])
+})

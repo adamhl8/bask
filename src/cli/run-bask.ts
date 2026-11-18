@@ -10,7 +10,7 @@ import { parseWithOptique } from "#cli/optique.ts"
 import { runTask } from "#cli/run-task.ts"
 import { splitArgs } from "#cli/split-args.ts"
 import { checkAllTaskArgs, toTaskParser } from "#cli/task-parser.ts"
-import { runWithArgs } from "#task.ts"
+import { runWithArgs } from "#task/command-line-args.ts"
 
 const ARGS_ERROR_EXIT_CODE = 2
 

@@ -4,7 +4,7 @@ import { attempt, err } from "ts-explicit-errors"
 
 import type { TaskIndex } from "#bask-file/task-index.ts"
 import { hasHiddenOutput } from "#shell/command.ts"
-import { getFailedTask } from "#task.ts"
+import { getFailedTask } from "#task/failed-task.ts"
 
 /** Runs a task and returns a failed command as an error that names the innermost task that failed. */
 export const runTask = async (tasks: TaskIndex, taskName: string, run: () => Promise<void>): Promise<Result> => {

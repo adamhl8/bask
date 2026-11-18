@@ -96,6 +96,113 @@ describe("args", () => {
   })
 })
 
+describe("cycles", () => {
+  const CYCLES = path.join(FIXTURES, "cycles.ts")
+
+  it.each([
+    ["when a task calls itself", "self-call", "Task 'self-call' calls itself: self-call -> self-call"],
+    ["when a hook calls its own task", "hooked", "Task 'hooked' calls itself: hooked -> hooked"],
+    ["on a cycle through other tasks", "first", "Task 'first' calls itself: first -> second -> first"],
+    [
+      "naming only the cycle when it starts partway down",
+      "outer",
+      "Task 'first' calls itself: first -> second -> first",
+    ],
+    [
+      "on a cycle between tasks that started at the same time",
+      "concurrent",
+      "Task 'slow-cycle' calls itself: slow-cycle -> fast-cycle -> slow-cycle",
+    ],
+  ])("should throw %s", async (_, taskName, message) => {
+    const { thrownMessage } = await runInProcess(CYCLES, taskName)
+
+    expect(thrownMessage).toBe(message)
+  })
+
+  it("should let code started inside a task's run call the task after the run finished", async () => {
+    const { stdout, thrownMessage } = await runInProcess(CYCLES, "after-finished")
+
+    expect(thrownMessage).toBeUndefined()
+    expect(stdout).toBe("ran finished\nlate call joined")
+  })
+})
+
+describe("wrap", () => {
+  const WRAP = path.join(FIXTURES, "wrap.ts")
+
+  it.each([
+    [
+      "wrap the hooks added before it, and run hooks added after it around the wrap",
+      ["build", "-r", "-w"],
+      "wrap start release=true watch=true\nbefore build\nran build watch=true\nafter build\nwrap end\nafter hook release=true",
+    ],
+    [
+      "append hooks to the layer the last wrap started",
+      ["layered"],
+      "outer before\nwrap start\nfirst before\nsecond before\nran layered\nfirst after\nwrap end\nouter after",
+    ],
+    ["replace the task when the wrap skips the original", ["skipped"], "replaced skipped"],
+    [
+      "stack wraps with the last one outermost",
+      ["stacked"],
+      "outer start\ninner start\nran stacked\ninner end\nouter end",
+    ],
+    ["run the original each time it's called", ["twice"], "ran twice\nran twice"],
+    ["give the original its own shell", ["shelled"], "X="],
+    [
+      "give a wrapped task run as a dependency empty args",
+      ["ci"],
+      "wrap start release=false watch=false\nbefore build\nran build watch=false\nafter build\nwrap end\nafter hook release=false",
+    ],
+  ])("should %s", async (_, args, output) => {
+    const { stdout } = await runInProcess(WRAP, ...args)
+
+    expect(stdout).toBe(output)
+  })
+
+  it("should add a wrap's args only to the wrapped task when tasks share an options object", async () => {
+    const sharedOptions = path.join(FIXTURES, "wrap-shared-options.ts")
+
+    const { stdout } = await runInProcess(sharedOptions, "dev", "--port", "3000")
+    const { stderr, exitCode } = await runInProcess(sharedOptions, "test", "--port", "3000")
+
+    expect(stdout).toBe("ran dev watch=false\nport=3000")
+    expect(exitCode).toBe(2)
+    expect(stderr).toContain('Unexpected option or argument: "--port"')
+  })
+
+  it("should throw when wrapping a task that has started", async () => {
+    const { stdout, thrownMessage } = await runInProcess(WRAP, "late-wrap")
+
+    expect(thrownMessage).toBe("Can't wrap a task that has already started")
+    expect(stdout).not.toContain("ran late wrap")
+  })
+
+  it("should throw when a wrap calls its own task", async () => {
+    const { thrownMessage } = await runInProcess(WRAP, "self-wrap")
+
+    expect(thrownMessage).toBe("Task 'self-wrap' calls itself: self-wrap -> self-wrap")
+  })
+
+  it("should throw on an arg name the task already has", async () => {
+    const { thrownMessage } = await runInProcess(path.join(FIXTURES, "wrap-duplicate-arg.ts"), "build")
+
+    expect(thrownMessage).toBe("Can't add arg 'watch' with wrap() because the task already has it")
+  })
+
+  it("should throw without a callback", async () => {
+    const { thrownMessage } = await runInProcess(path.join(FIXTURES, "wrap-missing-callback.ts"), "build")
+
+    expect(thrownMessage).toBe("wrap() needs a callback")
+  })
+
+  it("should wrap the built-in list task", async () => {
+    const { stdout } = await runInProcess(path.join(FIXTURES, "list-wrap.ts"), "-l")
+
+    expect(stdout).toBe("before list\nAvailable tasks:\n    build")
+  })
+})
+
 describe("task()", () => {
   it("should throw without a callback", async () => {
     const { thrownMessage } = await runInProcess(path.join(FIXTURES, "missing-callback.ts"), "build")

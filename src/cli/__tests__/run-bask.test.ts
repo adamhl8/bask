@@ -10,6 +10,8 @@ const FAILURES = path.join(FIXTURES, "failures.ts")
 
 const WATCH_HELP_LINE = /^ {2}-w, --watch +Rerun when files change$/mv
 
+const RELEASE_HELP_LINE = /^ {2}-r, --release +Build for release$/mv
+
 const TASK_LIST = `Available tasks:
     build     # Build the project [default] [alias: b]
     bump-deps # [aliases: up, update-deps]
@@ -313,6 +315,28 @@ describe("task arg declarations", () => {
 
   it("should fail on a flag that two args share", async () => {
     const { errorMessage } = await runInProcess(path.join(FIXTURES, "arg-duplicate.ts"))
+
+    expect(errorMessage).toStartWith("task 'build' has invalid args: ")
+  })
+})
+
+describe("wrapped task args", () => {
+  const WRAP = path.join(FIXTURES, "wrap.ts")
+
+  it("should show a wrap's args in the task list", async () => {
+    const { stdout } = await runInProcess(WRAP, "-l")
+
+    expect(stdout).toBe("Available tasks:\n    build # Build [-w/--watch] [-r/--release]")
+  })
+
+  it("should show a wrap's args on the task's help page", async () => {
+    const { stdout } = await runInProcess(WRAP, "-h", "build")
+
+    expect(stdout).toMatch(RELEASE_HELP_LINE)
+  })
+
+  it("should report a wrap's flag that collides with the task's own", async () => {
+    const { errorMessage } = await runInProcess(path.join(FIXTURES, "wrap-flag-collision.ts"))
 
     expect(errorMessage).toStartWith("task 'build' has invalid args: ")
   })

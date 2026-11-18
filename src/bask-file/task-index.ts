@@ -2,7 +2,7 @@ import { err } from "ts-explicit-errors"
 
 import type { BaskFileExports } from "#bask-file/bask-file.ts"
 import { isTask } from "#task.ts"
-import type { Task } from "#task.ts"
+import type { Task } from "#task/types.ts"
 import { toCamelCase, toKebabCase } from "#utils.ts"
 
 export interface TaskEntry {

@@ -110,6 +110,15 @@ describe("the bask command", () => {
     expect(stderr).toContain('Error: Unexpected option or argument: "--wach".')
   })
 
+  it("should run a wrapped task with its wrap's args", async () => {
+    const { run } = await createProject({ baskFile: "wrap.ts" })
+
+    const { stdout, exitCode } = await run`bask build -r`
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe("ran build\nrelease=true")
+  })
+
   it("should print a stack trace when a task throws", async () => {
     const { run } = await createProject({ baskFile: "failures.ts" })
 

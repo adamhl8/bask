@@ -16,6 +16,7 @@ A task runner where your tasks are TypeScript functions.
   - [Task arguments](#task-arguments)
   - [Task dependencies](#task-dependencies)
   - [Task hooks](#task-hooks)
+  - [Wrapping tasks](#wrapping-tasks)
 - [Running commands](#running-commands)
   - [Shell settings](#shell-settings)
 - [Extending/sharing tasks](#extendingsharing-tasks)
@@ -232,7 +233,7 @@ Args also show next to the task in the task list:
 
 ### Task dependencies
 
-To depend on another task, call it. Each task runs at most once per invocation, however many tasks call it. If two tasks call it at the same time, they both wait on the same run.
+To depend on another task, call it. Each task runs at most once per invocation, however many tasks call it. If two tasks call it at the same time, they both wait on the same run. A task that calls itself, directly or through other tasks, will throw an error.
 
 ```ts
 export const check = task(async () => {
@@ -270,7 +271,7 @@ build.after(async ({ sh }) => {
 ```
 
 - Hooks take tasks or plain functions
-- Hooks run in the order they were added
+- Hooks run in the order they were added (see [Wrapping tasks](#wrapping-tasks) for how they combine with wraps)
 - Hooks run once per invocation, along with their task
   - This includes when another task calls the task
 - Each hook gets its own `sh`, separate from the task's
@@ -295,6 +296,56 @@ import { list } from "@adamhl8/bask"
 list.after(() => {
   console.log("\nRun `bask <task>` to run a task.")
 })
+```
+
+---
+
+### Wrapping tasks
+
+> [!IMPORTANT]
+> Like hooks, you'll generally only need `wrap` when [extending tasks](#extendingsharing-tasks) from another bask file.
+
+Use `wrap` to change what a task does, or to add args to it. The function you pass wraps the task as it stands, including the hooks added so far, and `original()` runs what it wrapped:
+
+```ts
+import { build } from "./shared-tasks.ts"
+
+export * from "./shared-tasks.ts"
+
+// Add the `-r` flag which the original build task doesn't have.
+build.wrap({ args: { release: { short: "r", desc: "Build for release" } } }, async ({ sh, args, original }) => {
+  await original()
+  if (args.release) await sh`bun run sign`
+})
+```
+
+```sh
+bask build -r
+```
+
+- `wrap` changes the task in place, so everything that calls it, including other shared tasks, runs the wrapped version
+- The wrap function gets `sh`, `args`, and `positionals`, like the task, plus `original`
+- Call `original()` to run the wrapped task, or leave it out if you want to replace the task entirely
+  - `original()` runs the entire task as it was when it was wrapped, before and after hooks included
+  - `original` runs with the same `args` and `positionals`, and is given a fresh instance of `sh`
+  - Call `original()`, never the task itself, because a task that calls itself throws an error
+- `args` are added to the task's args, as if the task had declared them
+  - They're parsed from the command line, and they show in `bask -h <task>` and the task list
+  - An arg name the task already has throws an error
+- Hooks added before the wrap run inside it, as part of `original()`
+- Hooks added after the wrap run around it
+- Wrapping a task that has already started throws an error
+
+For example:
+
+```ts
+build.before(clean) // clean, build
+build.before(lint) // clean, lint, build
+build.wrap(async ({ original }) => {
+  console.log("start")
+  await original()
+}) // start, clean, lint, build
+build.before(check) // check, start, clean, lint, build
 ```
 
 ## Running commands
@@ -440,7 +491,7 @@ bask build
 # runs astroSync -> lint -> build -> astroBuild
 ```
 
-This way, each project extends the shared tasks without copying or replacing them.
+This way, each project extends the shared tasks without copying or replacing them. To change what a shared task does, or to add args to it, [wrap](#wrapping-tasks) it.
 
 ## CLI Reference
 
