@@ -1,3 +1,9 @@
+## [0.8.0](https://github.com/adamhl8/bask/compare/v0.7.1..v0.8.0) - 2026-11-18
+
+### 🚀 Features
+
+- add wrap function on tasks ([eb32b0d](https://github.com/adamhl8/bask/commit/eb32b0d27857a56f21e5b578d811577a5b220ff7) by @adamhl8)
+
 ## [0.7.1](https://github.com/adamhl8/bask/compare/v0.7.0..v0.7.1) - 2026-11-17
 
 ### 🐛 Bug Fixes
