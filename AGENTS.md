@@ -30,6 +30,19 @@ bask parses command-line args with `@optique/core`, but the task API never expos
   like `-l` throws, and `seq()` treats a `--` right after the task name as the end of the task's args. That's why
   `splitArgs` splits by position and each half gets its own parser.
 
+## Shell
+
+- `sh` runs each command as `/bin/sh -c <command>` with `Bun.spawn`, not Bun's `$`. Bun's `$` always pipes stdout and
+  stderr, so a command never sees the terminal, and it can't redirect to the terminal either.
+- A command inherits stdin, stdout, and stderr, like just and `npm run`. bask pipes only what it reads: stdout for a
+  reader like `.text()`, and stdout and stderr when the command is quiet. A failed command's `CommandError` holds only
+  the piped streams, and `runTask` prints them, because the terminal never showed them.
+- Interpolated strings are quoted with Bun's `$.escape`, even though Bun's shell no longer runs them. Its quoting works
+  in POSIX `sh` too. The test "should pass an interpolated value to the shell unchanged" sends a value full of shell
+  syntax through `/bin/sh`, so it fails if a Bun release changes that.
+- bask never sets `FORCE_COLOR` or any other color variable for a command. It used to, to make up for Bun's pipes, and
+  it leaked into every process the command started, including `bun test`.
+
 ## Tests
 
 - `minimalEnv()` passes only `PATH` and `HOME`, so a test that runs bask in a terminal (`runInTerminal`) gets no color
@@ -37,6 +50,8 @@ bask parses command-line args with `@optique/core`, but the task API never expos
 - Optique's colors come from the same `styleText` check as bask's own `error:` line (`toOptiqueOutput` in
   `src/cli/optique.ts`), so both follow `NO_COLOR`, `FORCE_COLOR`, and `TERM` the same way.
 - In-process tests can't rely on `runInProcess`'s minimal env to control color, because `styleText` reads the real
-  environment. bask sets `FORCE_COLOR` when it runs the tests in a terminal, so the test preload
-  (`src/__tests__/test-setup.ts`) removes it. With color on, Optique marks values with color instead of quotes, and
-  the assertions on quoted values fail.
+  environment. A `FORCE_COLOR` in the shell that runs the tests turns color on, and Optique then marks values with color
+  instead of quotes, so the assertions on quoted values fail.
+- `pwd` and `$PATH` come from `/bin/sh` itself. `sh` prints a logical `pwd` from an inherited `PWD` that names the same
+  folder by another path, which is why a command with a `cwd` gets `PWD` set to it. `sh` also fills in its own `$PATH`
+  when `PATH` is unset, so check for an unset `PATH` with `/usr/bin/printenv`.

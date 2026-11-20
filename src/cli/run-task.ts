@@ -1,9 +1,8 @@
-import bun from "bun"
 import type { Result } from "ts-explicit-errors"
 import { attempt, err } from "ts-explicit-errors"
 
 import type { TaskIndex } from "#bask-file/task-index.ts"
-import { hasHiddenOutput } from "#shell/command.ts"
+import { CommandError } from "#shell/command.ts"
 import { getFailedTask } from "#task/failed-task.ts"
 
 /** Runs a task and returns a failed command as an error that names the innermost task that failed. */
@@ -11,13 +10,11 @@ export const runTask = async (tasks: TaskIndex, taskName: string, run: () => Pro
   const error = await attempt(run)
   if (!error) return
   // Rethrow anything else, because a bug in a task file needs its stack trace.
-  if (!(error instanceof bun.$.ShellError)) throw error
+  if (!(error instanceof CommandError)) throw error
 
-  // Print the output of a command that hid it, because it usually explains the failure.
-  if (hasHiddenOutput(error)) {
-    process.stdout.write(error.stdout)
-    process.stderr.write(error.stderr)
-  }
+  // Print the output bask read instead of showing, because it usually explains the failure.
+  process.stdout.write(error.stdout)
+  process.stderr.write(error.stderr)
 
   const failedTask = getFailedTask(error)
   const failedEntry = failedTask && tasks.byTask.get(failedTask)

@@ -1,6 +1,6 @@
 import path from "node:path"
 
-import { addRuntimeBinToPath, logOutput } from "#shell/__tests__/fixtures/helpers.ts"
+import { addRuntimeBinToPath, AWKWARD_VALUE, logOutput } from "#shell/__tests__/fixtures/helpers.ts"
 import { task } from "#task.ts"
 
 addRuntimeBinToPath()
@@ -40,7 +40,12 @@ export const text = task(async ({ sh }) => {
 export const escaping = task(async ({ sh }) => {
   await logOutput(sh`echo ${["a b.txt", "c.txt"]}`)
   await logOutput(sh`echo ${"it's here"}`)
-  await logOutput(sh`echo ${{ raw: "one   two" }}`)
+  await logOutput(sh`echo ${{ raw: "one   two" }} ${7}`)
+})
+
+export const roundTrip = task(async ({ sh }) => {
+  const output = await sh`printf '%s' ${AWKWARD_VALUE}`.echo(false).text()
+  console.log(JSON.stringify(output))
 })
 
 export const cwd = task(async ({ sh }) => {
@@ -95,6 +100,10 @@ export const processEnv = task(async ({ sh }) => {
   await logOutput(sh`echo greeting=$GREETING`.env(process.env).echo(false))
 })
 
+export const killed = task(async ({ sh }) => {
+  await sh`kill -TERM $$`.echo(false)
+})
+
 export const json = task(async ({ sh }) => {
   const data: unknown = await sh`echo ${'{"name":"bask"}'}`.json()
   console.log(JSON.stringify(data))
@@ -140,11 +149,12 @@ export const awaitTwice = task(async ({ sh }) => {
   const command = sh`echo once`.quiet()
   await command
   const output = await command
-  console.log(output.text().trim())
+  console.log(output.stdout.trim())
 })
 
 export const noPath = task(async ({ sh }) => {
   sh.echo(false).env({ PATH: undefined })
-  await logOutput(sh`echo path=$PATH`)
-  await logOutput(sh`echo path=$PATH`.bun(false))
+  // Use `/usr/bin/printenv` because `PATH` is gone, and because `sh` sets its own `$PATH` without exporting it.
+  await logOutput(sh`/usr/bin/printenv PATH || echo unset`)
+  await logOutput(sh`/usr/bin/printenv PATH || echo unset`.bun(false))
 })

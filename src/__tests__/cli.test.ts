@@ -202,12 +202,23 @@ describe("command output", () => {
     expect(stderr).toBe("err\nerror: task 'shown-failure' failed with exit code 3")
   })
 
-  it("should force color for a command that writes to the terminal, unless it's quiet or the env sets color", async () => {
+  it("should give a command the terminal, and pipe only the streams bask reads", async () => {
     const { dir } = await createProject({ baskFile: "shell.ts" })
 
-    const output = await runInTerminal(dir, ["color"])
+    const output = await runInTerminal(dir, ["terminal"])
 
-    expect(output).toBe("color=1\r\nquiet=\r\nno-color=\r\nforced=0\r\n")
+    expect(output).toBe(
+      "0=tty 1=tty 2=tty color=\r\ntext: 0=tty 1=pipe 2=tty color=\r\nquiet: 0=tty 1=pipe 2=pipe color=\r\n",
+    )
+  })
+
+  it("should leave stderr on the terminal when a task reads stdout, unless the command is quiet", async () => {
+    const { run } = await createProject({ baskFile: "shell.ts" })
+
+    const { stdout, stderr } = await run`bask text-stderr`
+
+    expect(stdout).toBe("got out")
+    expect(stderr).toBe("warn")
   })
 })
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import path from "node:path"
 
 import { runInProcess } from "#__tests__/utils.ts"
+import { AWKWARD_VALUE } from "#shell/__tests__/fixtures/helpers.ts"
 
 const FIXTURES = path.join(import.meta.dir, "fixtures")
 const SHELL = path.join(FIXTURES, "shell.ts")
@@ -33,6 +34,13 @@ describe("exit codes", () => {
     expect(stdout).toBe("kept going")
     expect(stderr).toBe("exit 3\nexit 5")
     expect(errorMessage).toBe("task 'throws-toggle' failed with exit code 5")
+  })
+
+  it("should exit with 128 plus the signal's number when a signal ends the command", async () => {
+    const { errorMessage, exitCode } = await runInProcess(SHELL, "killed")
+
+    expect(exitCode).toBe(143)
+    expect(errorMessage).toBe("task 'killed' failed with exit code 143")
   })
 
   it("should handle a failed command with catch() and run finally()", async () => {
@@ -97,11 +105,17 @@ describe("printing commands", () => {
     expect(stderr).toBe("echo once")
   })
 
-  it("should print interpolated values the way the shell escapes them", async () => {
+  it("should print interpolated values the way they're quoted for the shell", async () => {
     const { stdout, stderr } = await runInProcess(SHELL, "escaping")
 
-    expect(stdout).toBe("a b.txt c.txt\nit's here\none two")
-    expect(stderr).toBe(`echo "a b.txt" c.txt\necho "it's here"\necho one   two`)
+    expect(stdout).toBe("a b.txt c.txt\nit's here\none two 7")
+    expect(stderr).toBe(`echo "a b.txt" c.txt\necho "it's here"\necho one   two 7`)
+  })
+
+  it("should pass an interpolated value to the shell unchanged", async () => {
+    const { stdout } = await runInProcess(SHELL, "round-trip")
+
+    expect(JSON.parse(stdout)).toBe(AWKWARD_VALUE)
   })
 })
 
@@ -161,7 +175,7 @@ describe("quiet", () => {
     const { stdout, thrownMessage } = await runInProcess(QUIET, "missing-cwd")
 
     expect(stdout).toBe("")
-    expect(thrownMessage).toContain("No such file or directory")
+    expect(thrownMessage).toContain("because its cwd 'missing' doesn't exist")
   })
 })
 
@@ -181,7 +195,7 @@ describe("node", () => {
   it("should leave PATH unset when env() removes it, with bun on or off", async () => {
     const { stdout } = await runInProcess(SHELL, "no-path")
 
-    expect(stdout).toBe("path=\npath=")
+    expect(stdout).toBe("unset\nunset")
   })
 })
 

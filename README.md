@@ -26,7 +26,7 @@ A task runner where your tasks are TypeScript functions.
 
 ## Installation
 
-bask requires [Bun](https://bun.sh) to be installed. Tasks are built on top of Bun's `$` shell.
+bask requires [Bun](https://bun.sh) to be installed. Commands run in `/bin/sh`, so bask works on macOS and Linux.
 
 - Your project does _not_ need to be Bun-based. You can use bask with any runtime (Node) or package manager (npm, yarn, pnpm, etc.).
 
@@ -350,7 +350,7 @@ build.before(check) // check, start, clean, lint, build
 
 ## Running commands
 
-Every task gets a shell, `sh`, which works like Bun's `$`. One difference is that `sh` prints each command before running it:
+Every task gets a shell, `sh`, which runs each command in `/bin/sh` and prints it before running it:
 
 ```ts
 export const lint = task(async ({ sh }) => {
@@ -364,7 +364,19 @@ export const lint = task(async ({ sh }) => {
 >
 > By default, `sh` runs `node_modules` bins and other `node` commands under Bun, like Bun's `--bun` flag. To use the real Node, see `.bun()` in [Shell settings](#shell-settings).
 
-To run a command without printing it, use `.echo(false)`:
+A command gets your terminal, like it would in a `package.json` script or a justfile. Interactive tools can prompt, and tools that check for a terminal show their colors and progress, so bask never sets `FORCE_COLOR`.
+
+Interpolated values are quoted for the shell, so a space, quote, or `$` in them stays literal:
+
+- An array becomes one word per item: ``sh`rm ${files}` ``
+- `{ raw: "..." }` goes in unquoted, for text you want the shell to parse
+
+To read a command's output, use one of the readers below. A reader takes stdout instead of showing it, but stderr still goes to the terminal, so warnings and prompts still show:
+
+- `.text()` - stdout as a string
+- `.json()` - stdout parsed as JSON
+- `.lines()` - stdout one line at a time, as the command prints it
+- `.arrayBuffer()` and `.blob()` - stdout as bytes
 
 ```ts
 export const release = task(async ({ sh }) => {
@@ -373,7 +385,7 @@ export const release = task(async ({ sh }) => {
 })
 ```
 
-See the [Bun Shell docs](https://bun.sh/docs/runtime/shell) for the full API.
+Awaiting a command gives `{ exitCode, stdout, stderr }`. `stdout` and `stderr` hold only what bask read instead of showing, so they're empty unless the command is quiet. A command that fails throws a `CommandError` with the same three fields, unless it's set to `.nothrow()`.
 
 ### Shell settings
 
@@ -385,7 +397,7 @@ The following methods can be used on the `sh` instance _or_ on each command. To 
   - Set a variable to `undefined` to remove it: `.env({ DEBUG: undefined })`
   - Commands use `process.env` as it was when `bask.ts` finished loading, so later changes to it don't reach them
   - Pass later changes through with `.env(process.env)`. This also brings back variables removed earlier, so put removals after it: `.env({ ...process.env, DEBUG: undefined })`
-- `.quiet()` - Hides the command's output instead of writing it to the terminal
+- `.quiet()` - Reads the command's stdout and stderr instead of writing them to the terminal
   - If a quiet command fails and the error isn't caught, bask prints its output along with the error
 - `.nothrow()` - Doesn't throw an error when a command exits with a non-zero exit code
 - `.throws()` - Sets whether a non-zero exit code throws an error
