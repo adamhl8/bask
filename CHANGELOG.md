@@ -1,3 +1,15 @@
+## [0.9.0](https://github.com/adamhl8/bask/compare/v0.8.0..v0.9.0) - 2026-11-20
+
+### 🚀 Features
+
+- run bask.ts with the global bask when the project doesn't install it ([51b543e](https://github.com/adamhl8/bask/commit/51b543ee66711682859fe5b4609c61704742e148) by @adamhl8)
+
+- add --version ([6bd9a20](https://github.com/adamhl8/bask/commit/6bd9a204115a7dfe147f5b5ee17819d95e20b497) by @adamhl8)
+
+- keep the exit code a task sets ([9ae6ba9](https://github.com/adamhl8/bask/commit/9ae6ba98977c099ef93652e40fe6f7e3fa33263b) by @adamhl8)
+
+- run commands in /bin/sh with the terminal ([519d7cd](https://github.com/adamhl8/bask/commit/519d7cd9eca757976736c8c0c8bbe9032f804f6d) by @adamhl8)
+
 ## [0.8.0](https://github.com/adamhl8/bask/compare/v0.7.1..v0.8.0) - 2026-11-18
 
 ### 🚀 Features
