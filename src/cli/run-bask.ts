@@ -10,6 +10,7 @@ import { parseWithOptique } from "#cli/optique.ts"
 import { runTask } from "#cli/run-task.ts"
 import { splitArgs } from "#cli/split-args.ts"
 import { checkAllTaskArgs, toTaskParser } from "#cli/task-parser.ts"
+import packageJson from "#package.json" with { type: "json" }
 import { runWithArgs } from "#task/command-line-args.ts"
 
 const ARGS_ERROR_EXIT_CODE = 2
@@ -37,6 +38,11 @@ export const runBask = async (args: string[], baskPath: string): Promise<Result<
   const baskParser = toBaskParser(anyTaskName)
   const baskFlags = parseWithOptique(baskParser, "bask", baskInput)
   if (!baskFlags) return ARGS_ERROR_EXIT_CODE
+
+  if (baskFlags.version) {
+    process.stdout.write(`${packageJson.version}\n`)
+    return 0
+  }
 
   if (baskFlags.help && taskName === undefined) {
     printBaskHelp(baskParser)

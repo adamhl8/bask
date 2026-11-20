@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test"
 import path from "node:path"
 
 import { runInProcess } from "#__tests__/utils.ts"
+import packageJson from "#package.json" with { type: "json" }
 
 const FIXTURES = path.join(import.meta.dir, "fixtures")
 const TASKS = path.join(FIXTURES, "tasks.ts")
@@ -241,7 +242,22 @@ describe("bask's own args and help", () => {
     expect(exitCode).toBe(0)
     expect(stdout).toStartWith("Usage: bask")
     expect(stdout).toContain("-l, --list")
+    expect(stdout).toContain("--version")
     expect(stdout).toEndWith(`Run \`bask -h <task>\` to see a task's args.\n\n${TASK_LIST}`)
+  })
+
+  it("should print the version without a bask.ts", async () => {
+    const { stdout, exitCode } = await runInProcess(path.join(FIXTURES, "missing.ts"), "--version")
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe(packageJson.version)
+  })
+
+  it("should print the version instead of running a task named after it", async () => {
+    const { stdout, exitCode } = await runInProcess(TASKS, "--version", "build")
+
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe(packageJson.version)
   })
 
   it("should print a task's help page", async () => {

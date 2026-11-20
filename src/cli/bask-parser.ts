@@ -12,6 +12,7 @@ export const toBaskParser = (taskName: ValueParser<"sync", string>) =>
   object({
     list: withDefault(flag("-l", "--list", { description: message`List the tasks` }), false),
     help: withDefault(flag("-h", "--help", { description: message`Show bask's help, or a task's help` }), false),
+    version: withDefault(flag("--version", { description: message`Show bask's version` }), false),
     task: optional(argument(taskName, { description: message`The task to run (default: the default export)` })),
   })
 

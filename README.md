@@ -507,12 +507,13 @@ This way, each project extends the shared tasks without copying or replacing the
 
 ## CLI Reference
 
-`bask [-l] [-h] [task] [task args]`
+`bask [-l] [-h] [--version] [task] [task args]`
 
 - `task`: The task to run, by its kebab-case name, camelCase name, or an alias (default: the default export)
 - `task args`: The [args and positionals](#task-arguments) to pass to the task
 - `-l`, `--list`: List the available tasks
 - `-h`, `--help`: Show bask's help and the task list, or a task's help with `bask -h <task>`
+- `--version`: Show bask's version
 
 If the arguments are invalid, including an unknown task, bask prints the usage and an error.
 

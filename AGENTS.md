@@ -29,6 +29,8 @@ bask parses command-line args with `@optique/core`, but the task API never expos
 - One Optique parser can't hold both bask's flags and a task's flags. Optique matches flags by name, so a shared name
   like `-l` throws, and `seq()` treats a `--` right after the task name as the end of the task's args. That's why
   `splitArgs` splits by position and each half gets its own parser.
+- `-h` and `--version` are plain flags in `toBaskParser`, not Optique's runner options. bask's help page comes from
+  `getDocPage(baskParser)`, which leaves out the options the runner adds.
 
 ## Shell
 

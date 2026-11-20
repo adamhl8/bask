@@ -32,7 +32,8 @@
   ],
   "type": "module",
   "imports": {
-    "#*": "./src/*"
+    "#*": "./src/*",
+    "#package.json": "./package.json"
   },
   "exports": {
     ".": {
