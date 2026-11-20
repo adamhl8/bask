@@ -521,4 +521,6 @@ If the arguments are invalid, including an unknown task, bask prints the usage a
 - `0`: The task succeeded
 - `1`: There's no `bask.ts`, or it has a problem (e.g. a task exported twice)
 - `2`: The arguments are invalid, including an unknown task or the task's args
-- Otherwise, the exit code of the command that failed
+- A task can set `process.exitCode` to make bask exit with that code without reporting an error. The code belongs to the
+  process, so a task that another task calls can set it too.
+- Otherwise, the exit code of the command that failed, which replaces any code a task set

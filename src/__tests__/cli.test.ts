@@ -82,6 +82,25 @@ describe("the bask command", () => {
     expect(stderr).toBe("exit 3\nerror: task 'fail' failed with exit code 3")
   })
 
+  it("should exit with the exit code a task set", async () => {
+    const { run } = await createProject({ baskFile: "exit-code.ts" })
+
+    const { stdout, stderr, exitCode } = await run`bask plan`.nothrow()
+
+    expect(exitCode).toBe(2)
+    expect(stdout).toBe("ran plan\nran after")
+    expect(stderr).toBe("")
+  })
+
+  it("should exit with a failed command's exit code over one the task set", async () => {
+    const { run } = await createProject({ baskFile: "exit-code.ts" })
+
+    const { stderr, exitCode } = await run`bask plan-then-fail`.nothrow()
+
+    expect(exitCode).toBe(3)
+    expect(stderr).toBe("exit 3\nerror: task 'plan-then-fail' failed with exit code 3")
+  })
+
   it("should exit with 2 on an unknown flag", async () => {
     const { run } = await createProject()
 
@@ -165,13 +184,40 @@ describe("the project's own install", () => {
   it("should run itself when the project doesn't install bask", async () => {
     const { dir, run } = await createProject()
     const emptyDir = await makeTempDir()
-    // Add `node_modules` because Bun auto-installs packages for a folder without one, which would resolve a bask.
+    // Add `node_modules` so this covers a project that has one but doesn't install bask.
     await fs.mkdir(path.join(emptyDir, "node_modules"))
 
     const { stderr, exitCode } = await run`${path.join(dir, "node_modules/.bin/bask")}`.cwd(emptyDir).nothrow()
 
     expect(exitCode).toBe(1)
     expect(stderr).toBe(`error: no bask.ts in ${await fs.realpath(emptyDir)}`)
+  })
+
+  it("should run itself without asking the registry when the folder has no `node_modules`", async () => {
+    const { dir } = await createProject()
+    const emptyDir = await makeTempDir()
+    const emptyCacheDir = await makeTempDir()
+    let registryRequests = 0
+    using registry = bun.serve({
+      port: 0,
+      fetch: () => {
+        registryRequests += 1
+        return new Response(undefined, { status: 404 })
+      },
+    })
+
+    // Point Bun at an empty cache so an auto-install has to ask the stand-in registry.
+    const subprocess = bun.spawn([path.join(dir, "node_modules/.bin/bask")], {
+      cwd: emptyDir,
+      env: minimalEnv({ BUN_CONFIG_REGISTRY: registry.url.href, BUN_INSTALL_CACHE_DIR: emptyCacheDir }),
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+    const [exitCode, stderr] = await Promise.all([subprocess.exited, subprocess.stderr.text()])
+
+    expect(registryRequests).toBe(0)
+    expect(exitCode).toBe(1)
+    expect(stderr).toBe(`error: no bask.ts in ${await fs.realpath(emptyDir)}\n`)
   })
 })
 
