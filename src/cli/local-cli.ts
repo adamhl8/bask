@@ -31,3 +31,18 @@ export const findLocalCli = (cwd: string, runningCliPath: string): LocalCli | un
 
   return { cliPath, isRunning: cliPath === runningCliPath }
 }
+
+/**
+ * Serves this copy's exports as `@adamhl8/bask`, so a `bask.ts` with no local copy gets the running one. `isTask` only
+ * recognizes tasks made by its own copy, and Bun would otherwise auto-install another.
+ */
+export const provideRunningCopy = async () => {
+  const exports = await import("#index.ts")
+  // Use `build.module` because a runtime plugin's `onResolve` never fires for a bare package name.
+  bun.plugin({
+    name: "bask-running-copy",
+    setup: (build) => {
+      build.module("@adamhl8/bask", () => ({ exports, loader: "object" }))
+    },
+  })
+}

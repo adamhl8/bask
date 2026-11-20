@@ -41,6 +41,42 @@ const writeBin = async (dir: string, name: string, script: string) => {
   await fs.chmod(binPath, 0o755)
 }
 
+/**
+ * Runs `binPath` in `cwd` with Bun pointed at an empty cache and a local registry that answers 404, and counts the
+ * requests it gets. The empty cache makes an auto-install ask the stand-in registry.
+ */
+const runWithStandInRegistry = async (binPath: string, cwd: string) => {
+  const emptyCacheDir = await makeTempDir()
+  let registryRequests = 0
+  using registry = bun.serve({
+    port: 0,
+    fetch: () => {
+      registryRequests += 1
+      return new Response(undefined, { status: 404 })
+    },
+  })
+
+  const subprocess = bun.spawn([binPath], {
+    cwd,
+    env: minimalEnv({ BUN_CONFIG_REGISTRY: registry.url.href, BUN_INSTALL_CACHE_DIR: emptyCacheDir }),
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+  const [exitCode, stdout, stderr] = await Promise.all([
+    subprocess.exited,
+    subprocess.stdout.text(),
+    subprocess.stderr.text(),
+  ])
+  return { exitCode, stdout, stderr, registryRequests }
+}
+
+const STANDALONE_BASK_FILE = `import { task } from "@adamhl8/bask"
+
+export default task(() => {
+  console.log("ran default")
+})
+`
+
 const echoScript = (output: string) => `#!/bin/sh\necho ${output}\n`
 const runtimeScript = `#!/usr/bin/env node\nconsole.log(process.versions.bun ? "bun" : "node")\n`
 
@@ -181,6 +217,19 @@ describe("the project's own install", () => {
     expect(stderr).toBe("exit 3\nerror: task 'fail' failed with exit code 3")
   })
 
+  it("should keep the exit code a task set when started from another install", async () => {
+    const { dir } = await createProject({ baskFile: "exit-code.ts" })
+    const { dir: otherDir, run } = await createProject()
+
+    const { stdout, stderr, exitCode } = await run`${path.join(otherDir, "node_modules/.bin/bask")} plan`
+      .cwd(dir)
+      .nothrow()
+
+    expect(exitCode).toBe(2)
+    expect(stdout).toBe("ran plan\nran after")
+    expect(stderr).toBe("")
+  })
+
   it("should run itself when the project doesn't install bask", async () => {
     const { dir, run } = await createProject()
     const emptyDir = await makeTempDir()
@@ -196,28 +245,34 @@ describe("the project's own install", () => {
   it("should run itself without asking the registry when the folder has no `node_modules`", async () => {
     const { dir } = await createProject()
     const emptyDir = await makeTempDir()
-    const emptyCacheDir = await makeTempDir()
-    let registryRequests = 0
-    using registry = bun.serve({
-      port: 0,
-      fetch: () => {
-        registryRequests += 1
-        return new Response(undefined, { status: 404 })
-      },
-    })
 
-    // Point Bun at an empty cache so an auto-install has to ask the stand-in registry.
-    const subprocess = bun.spawn([path.join(dir, "node_modules/.bin/bask")], {
-      cwd: emptyDir,
-      env: minimalEnv({ BUN_CONFIG_REGISTRY: registry.url.href, BUN_INSTALL_CACHE_DIR: emptyCacheDir }),
-      stdout: "pipe",
-      stderr: "pipe",
-    })
-    const [exitCode, stderr] = await Promise.all([subprocess.exited, subprocess.stderr.text()])
+    const { stderr, exitCode, registryRequests } = await runWithStandInRegistry(
+      path.join(dir, "node_modules/.bin/bask"),
+      emptyDir,
+    )
 
     expect(registryRequests).toBe(0)
     expect(exitCode).toBe(1)
     expect(stderr).toBe(`error: no bask.ts in ${await fs.realpath(emptyDir)}\n`)
+  })
+
+  it.each([
+    ["has no `node_modules`", []],
+    ["has a `node_modules` without bask", ["node_modules"]],
+  ])("should run a bask.ts with its own copy when the folder %s", async (_folder, subfolders) => {
+    const { dir } = await createProject()
+    const baskDir = await makeTempDir()
+    await Promise.all(subfolders.map(async (subfolder) => fs.mkdir(path.join(baskDir, subfolder))))
+    await bun.write(path.join(baskDir, "bask.ts"), STANDALONE_BASK_FILE)
+
+    const { stdout, exitCode, registryRequests } = await runWithStandInRegistry(
+      path.join(dir, "node_modules/.bin/bask"),
+      baskDir,
+    )
+
+    expect(registryRequests).toBe(0)
+    expect(exitCode).toBe(0)
+    expect(stdout).toBe("ran default\n")
   })
 })
 

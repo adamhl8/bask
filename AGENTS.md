@@ -16,6 +16,18 @@
   reference to ..."). The subprocess test "should let a bask.ts emit declarations for a task that takes no args"
   checks this against the packed package.
 
+## Global and local copies
+
+- A global bask hands off to the project's copy by importing its CLI in the same process, so the project's copy sets
+  the exit code itself.
+- `isTask` only recognizes tasks made by its own copy, so `bask.ts` must import the copy that's running. With no local
+  copy, `provideRunningCopy` in `src/cli/local-cli.ts` serves the running copy's exports as a virtual
+  `@adamhl8/bask` module.
+- That uses `build.module`, because a runtime `Bun.plugin`'s `onResolve` never fires for a bare package name.
+- Bun auto-installs imports in a folder with no `node_modules` up the tree, which is why `findLocalCli` checks for one.
+  Tests that cover this point Bun at an empty cache and a local stand-in registry (`runWithStandInRegistry`), so they
+  never reach npm.
+
 ## Optique
 
 bask parses command-line args with `@optique/core`, but the task API never exposes it.
